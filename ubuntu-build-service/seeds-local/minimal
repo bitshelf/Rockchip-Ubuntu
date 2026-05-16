@@ -1,0 +1,44 @@
+Task-Section: user
+Task-Relevance: 9
+Task-Description: Minimal base system (Rockchip embedded)
+Task-Extended-Description: Trimmed core system for Rockchip embedded devices.
+Task-Test-new-install: install skip
+Task-Seeds: required
+
+Stripped-down version of the minimal seed. Only packages essential for
+a working embedded Linux system.
+
+= Comfortable Unix System =
+
+ * adduser
+ * apt
+ * apt-utils         # apt-extracttemplates is required for debconf preconfiguration
+ * console-setup
+ * debconf-i18n
+ * kbd
+ * less
+ * locales
+ * lsb-release
+ * kmod
+ * netbase
+ * python3
+ * sudo
+ * sysvinit-utils    # until "pidof" moves into procps, Debian #810018
+ * tzdata
+ * ubuntu-keyring    # for authenticated package downloads
+ * udev
+ * vim-tiny
+ * whiptail          # for debconf's Dialog frontend
+
+= Networking =
+
+ * dhcpcd-base
+ * iproute2
+ * netplan.io
+ * iputils-ping
+ * netcat-openbsd
+
+= Meta =
+
+ * init
+ * ubuntu-minimal

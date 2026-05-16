@@ -1,0 +1,62 @@
+Task-Section: user
+Task-Relevance: 8
+Task-Description: Standard system (Rockchip embedded)
+Task-Extended-Description: Trimmed character-mode system for Rockchip embedded.
+Task-Key: ubuntu-standard
+Task-Test-new-install: install skip
+
+Stripped-down standard seed for embedded use.
+
+= UNIX =
+
+ * cpio
+ * cron
+ * file
+ * libpam-systemd    # proper logind sessions
+ * logrotate
+ * man-db
+ * (manpages)
+ * media-types
+ * parted
+ * psmisc
+ * pciutils
+ * usbutils
+ * time
+ * xz-utils
+
+= Filesystems =
+
+ * dosfstools
+
+= Networking =
+
+ * bind9-dnsutils
+ * nftables
+ * (openssh-client)
+ * rsync
+ * wget
+
+= Debugging and Diagnostics =
+
+ * strace
+ * lshw
+ * lsof
+ * (ethtool)
+
+= Other =
+
+ * ubuntu-standard
+
+= Blacklist =
+
+ * !inetutils-ftp
+ * !inetutils-ftpd
+ * !inetutils-inetd
+ * !inetutils-ping
+ * !inetutils-syslogd
+ * !inetutils-talk
+ * !inetutils-talkd
+ * !inetutils-telnetd
+ * !inetutils-tools
+ * !inetutils-traceroute
+ * !telnetd

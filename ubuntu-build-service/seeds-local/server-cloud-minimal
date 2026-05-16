@@ -1,0 +1,25 @@
+Common packages for minimal Ubuntu server, stripped for Rockchip embedded.
+
+ * feature: no-follow-recommends
+
+== Core ==
+
+ * apt
+ * bzip2
+ * ca-certificates
+ * initramfs-tools
+ * keyutils
+ * krb5-locales
+ * libpam-systemd
+ * netbase
+ * pollinate
+ * snapd                   # required for snap-preseed
+ * sudo
+ * systemd
+ * systemd-resolved
+ * systemd-sysv
+ * udev
+
+== Block device / filesystem tools ==
+
+ * e2fsprogs

@@ -1,0 +1,22 @@
+Task-Description: Minimal Ubuntu cloud (Rockchip embedded)
+Task-Seeds: server-cloud-minimal
+Task-Key: cloud-minimal
+
+The above seed (server-cloud-minimal) is the seed we inherit from.
+
+ * feature: no-follow-recommends
+
+== Packages needed on top of server-cloud-minimal ==
+
+ * console-setup
+ * openssh-server
+
+== Dependencies of cloud-init modules ==
+
+ * cloud-init
+ * parted
+ * util-linux
+
+== System time ==
+
+ * systemd-timesyncd | time-daemon

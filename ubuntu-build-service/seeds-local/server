@@ -1,0 +1,47 @@
+Task-Section: server
+Task-Description: Basic Ubuntu server (Rockchip embedded)
+Task-Extended-Description: Trimmed server environment for Rockchip embedded.
+Task-Relevance: 8
+Task-Key: screen
+
+= System administration =
+
+ * curl
+ * git
+ * patch
+ * screen
+ * tmux
+ * vim
+ * wget
+
+= Network =
+
+ * ethtool
+
+= Block Device and Filesystem =
+
+ * btrfs-progs
+ * xfsprogs
+
+= Debugging and Diagnostics =
+
+ * htop
+
+= Other =
+
+ * gnupg
+ * dirmngr
+
+= Blacklist =
+
+ * !inetutils-ftp
+ * !inetutils-ftpd
+ * !inetutils-inetd
+ * !inetutils-ping
+ * !inetutils-syslogd
+ * !inetutils-talk
+ * !inetutils-talkd
+ * !inetutils-telnetd
+ * !inetutils-tools
+ * !inetutils-traceroute
+ * !telnetd

@@ -1,0 +1,19 @@
+= generic =
+
+ * linux-generic
+
+= OpenSSH server =
+
+ * openssh-server
+
+= Net = 
+
+ * isc-dhcp-client
+ * iw
+ * wpasupplicant
+
+= Filesystem tools =
+
+ * e2fsprogs
+ * btrfs-progs
+ * xfsprogs

@@ -1,0 +1,112 @@
+name: ubuntu-desktop-rk3576-arm64
+display-name: Ubuntu Desktop RK3576 arm64
+revision: 1
+architecture: arm64
+series: noble
+class: preinstalled
+kernel: linux-image-generic
+
+rootfs:
+  components:
+    - main
+    - restricted
+    - universe
+    - multiverse
+  archive: ubuntu
+  mirror: "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/"
+  pocket: updates
+  sources-list-deb822: true
+  seed:
+    urls:
+      - "file:///tmp/ubuntu-seeds-git"
+      # - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"  # fallback
+    branch: noble
+    vcs: true
+    names:
+      - desktop-minimal
+      - desktop
+
+customization:
+  cloud-init:
+    user-data: |
+      #cloud-config
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
+  extra-snaps:
+    - name: snapd
+  extra-packages:
+    # GNOME desktop core
+    - name: ubuntu-desktop-minimal
+    - name: gdm3
+    # Basic system tools
+    - name: file
+    # Boot and device tree tools
+    - name: u-boot-tools
+    - name: device-tree-compiler
+    # Filesystem tools
+    - name: dosfstools
+    - name: f2fs-tools
+    - name: btrfs-progs
+    - name: parted
+    - name: e2fsprogs
+    # Networking
+    - name: network-manager
+    - name: openssh-server
+    - name: ethtool
+    - name: iw
+    - name: wpasupplicant
+    # System utilities
+    - name: vim
+    - name: htop
+    - name: iotop
+    - name: usbutils
+    - name: pciutils
+    - name: lshw
+    # Firmware
+    - name: linux-firmware
+    # Development
+    - name: build-essential
+    - name: flex
+    - name: bison
+    # Locale: EN default, ZH installed as option (not default)
+    - name: language-pack-en-base
+    - name: language-pack-zh-hans
+    - name: language-pack-gnome-en-base
+    - name: language-pack-gnome-zh-hans
+  fstab:
+    - label: "boot"
+      mountpoint: "/boot"
+      filesystem-type: "ext4"
+      dump: false
+      fsck-order: 1
+    - label: "overlay"
+      mountpoint: "/overlay"
+      filesystem-type: "ext4"
+      dump: false
+      fsck-order: 2
+  manual:
+    make-dirs:
+      - path: /ro
+        permissions: 0755
+      - path: /overlay
+        permissions: 0755
+  extra-apt-sources:
+    rockchip-local:
+      types: [deb]
+      uris: ["file:///tmp/ubuntu-local-apt"]
+      suites: [noble]
+      components: [main]
+      trusted: true
+
+artifacts:
+  rootfs-tarball:
+    name: rootfs.tar.gz
+    compression: gzip
+  manifest:
+    name: ubuntu-24.04-preinstalled-desktop-arm64+rk3576.manifest
+  filelist:
+    name: ubuntu-24.04-preinstalled-desktop-arm64+rk3576.filelist

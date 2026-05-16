@@ -1,0 +1,32 @@
+Task-Description: Minimal Ubuntu server (Rockchip embedded)
+Task-Seeds: server-cloud-minimal
+
+ * feature: no-follow-recommends
+
+= Block device / filesystem tools =
+
+ * btrfs-progs
+ * cryptsetup
+ * xfsprogs
+
+= Other =
+
+ * ubuntu-server-minimal
+ * openssh-server
+ * isc-dhcp-client
+ * iw
+ * wpasupplicant
+
+= Blacklist =
+
+ * !inetutils-ftp
+ * !inetutils-ftpd
+ * !inetutils-inetd
+ * !inetutils-ping
+ * !inetutils-syslogd
+ * !inetutils-talk
+ * !inetutils-talkd
+ * !inetutils-telnetd
+ * !inetutils-tools
+ * !inetutils-traceroute
+ * !telnetd
