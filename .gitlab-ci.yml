@@ -1,0 +1,135 @@
+# ==========================================================================
+# GitLab CI/CD — Ubuntu Image Build for RK3576 (ARM64 Native)
+#
+# Runs on self-hosted GitLab Runner on MYD-LR3576 Debian board.
+# Runner tags: rk3576, arm64, linux
+#
+# .env auto-detects aarch64 → BUILD_MODE=local (native build).
+# Only rootfs.tar.gz is built here; packaging (update.img) happens
+# on the x86 dev host separately.
+# ==========================================================================
+
+stages:
+  - build
+  - test
+  - upload
+
+variables:
+  DEBIAN_FRONTEND: noninteractive
+  BOARD: rk3576
+  UBUNTU_VARIANT: desktop
+  UBUNTU_SERIES: noble
+
+# ── Cache apt packages for faster rebuilds ────────────────────────────────
+.apt_cache: &apt_cache
+  cache:
+    key: apt-$CI_COMMIT_REF_SLUG
+    paths:
+      - /var/cache/apt/archives/
+    policy: pull-push
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Stage 1: Build rootfs
+# ═══════════════════════════════════════════════════════════════════════════
+build-rootfs:
+  stage: build
+  tags:
+    - rk3576
+    - arm64
+  timeout: 3h
+  <<: *apt_cache
+  script:
+    - echo "=== Build Environment ==="
+    - echo "Host: $(hostname)"
+    - echo "Arch: $(uname -m)"
+    - echo "Disk: $(df -h / | tail -1)"
+    - echo ""
+
+    # Install build deps if needed
+    - |
+      if sudo /snap/bin/ubuntu-image classic --help &>/dev/null 2>&1; then
+        echo "ubuntu-image already installed."
+      else
+        echo "Installing build dependencies..."
+        sudo bash scripts/setup-target.sh
+      fi
+
+    # Fix /tmp noexec (LP:#2075546)
+    - findmnt /tmp 2>/dev/null | grep -q noexec && sudo mount -o remount,exec /tmp || true
+
+    # Build rootfs natively
+    - echo "=== Building rootfs (native ARM64) ==="
+    - echo "Started: $(date)"
+    - |
+      source .env
+      export BOARD="${BOARD}"
+      export SDK_PATH="${CI_PROJECT_DIR}"
+      export PROJECT_DIR="${CI_PROJECT_DIR}"
+      export UBUNTU_VARIANT="${UBUNTU_VARIANT:-desktop}"
+      export UBUNTU_SERIES="${UBUNTU_SERIES:-noble}"
+      export SKIP_SDK_CHECKS=1
+      export PACKAGE_METHOD=mkupdate
+
+      sudo -E bash build.sh rootfs-only
+    - echo "Finished: $(date)"
+
+    # Verify
+    - ls -lh artifacts/rootfs.tar.gz
+    - gzip -t artifacts/rootfs.tar.gz && echo "GZIP_OK"
+
+  artifacts:
+    name: "rootfs-${UBUNTU_VARIANT}-${UBUNTU_SERIES}-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - artifacts/rootfs.tar.gz
+      - artifacts/ubuntu-image.log
+      - artifacts/*.manifest
+      - artifacts/*.filelist
+    expire_in: 7 days
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Stage 2: Verify rootfs (Ubuntu compliance tests)
+# ═══════════════════════════════════════════════════════════════════════════
+verify-rootfs:
+  stage: test
+  tags:
+    - rk3576
+    - arm64
+  needs:
+    - build-rootfs
+  script:
+    - echo "=== Verifying rootfs ==="
+    - tar tzf artifacts/rootfs.tar.gz | head -20
+    - |
+      echo "Size: $(du -h artifacts/rootfs.tar.gz | cut -f1)"
+      echo "Files: $(tar tzf artifacts/rootfs.tar.gz | wc -l)"
+    - |
+      # Verify key files exist in tarball
+      for f in etc/os-release usr/bin/systemctl boot/ usr/lib/systemd/systemd; do
+        if tar tzf artifacts/rootfs.tar.gz | grep -q "$f"; then
+          echo "  ✓ $f"
+        else
+          echo "  ✗ $f MISSING"
+          exit 1
+        fi
+      done
+    - echo "Verify OK"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Stage 3: Manual upload (triggers when tag is pushed)
+# ═══════════════════════════════════════════════════════════════════════════
+upload-release:
+  stage: upload
+  tags:
+    - rk3576
+    - arm64
+  needs:
+    - verify-rootfs
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "=== Release: ${CI_COMMIT_TAG} ==="
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ubuntu-rootfs/${CI_COMMIT_TAG}/rootfs.tar.gz" \
+        --upload-file artifacts/rootfs.tar.gz 2>&1 || true
+    - echo "Release uploaded to GitLab Package Registry"
