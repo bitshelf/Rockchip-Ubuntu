@@ -101,9 +101,9 @@ jobs:
           echo "Start: $(date -u)" >> "${LOG}"
 
           # Select YAML definition
-          YAML="${SCRIPT_DIR}/image-definition.yaml"
+          YAML="${SCRIPT_DIR}/ubuntu-build-service/image-definition-desktop-noble.yaml"
           if [[ "${SERIES}" == "questing" ]]; then
-            YAML="${SCRIPT_DIR}/image-definition-questing.yaml"
+            YAML="${SCRIPT_DIR}/ubuntu-build-service/image-definition-server-questing.yaml"
           fi
 
           # Use Launchpad seeds directly — same approach as successful
