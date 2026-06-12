@@ -4,9 +4,19 @@ on:
   push:
     branches: [main]
     paths:
-      - 'ubuntu/**'
+      - '**.sh'
+      - '**.yaml'
+      - '**.conf'
+      - 'boards/**'
+      - 'seeds/**'
+      - 'seeds-local/**'
+      - 'seeds-questing/**'
+      - 'scripts/**'
+      - 'ubuntu-build-service/**'
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+      - 'packages/**'
       - 'arm64-classic.yaml'
-      - '.github/workflows/build-image.yml'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -81,7 +91,7 @@ jobs:
           set -euo pipefail
           SERIES="${{ steps.select.outputs.series }}"
           MIRROR="http://ports.ubuntu.com/ubuntu-ports/"
-          SCRIPT_DIR="${{ github.workspace }}/ubuntu"
+          SCRIPT_DIR="${{ github.workspace }}"
           ARTIFACTS="${SCRIPT_DIR}/artifacts"
           rm -rf "${ARTIFACTS}"
           mkdir -p "${ARTIFACTS}"
@@ -153,13 +163,13 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ubuntu-image-log-${{ steps.select.outputs.series }}
-          path: ubuntu/artifacts/ubuntu-image.log
+          path: artifacts/ubuntu-image.log
           retention-days: 3
 
       - name: Verify rootfs tarball
         if: success()
         run: |
-          ARTIFACTS="${{ github.workspace }}/ubuntu/artifacts"
+          ARTIFACTS="${{ github.workspace }}/artifacts"
           echo "=== rootfs.tar.gz ==="
           ls -lh "${ARTIFACTS}/rootfs.tar.gz"
           echo "=== Contents (first 20 entries) ==="
@@ -181,9 +191,9 @@ jobs:
         with:
           name: ubuntu-rootfs-${{ steps.select.outputs.series }}-arm64
           path: |
-            ubuntu/artifacts/rootfs.tar.gz
-            ubuntu/artifacts/*.manifest
-            ubuntu/artifacts/*.filelist
+            artifacts/rootfs.tar.gz
+            artifacts/*.manifest
+            artifacts/*.filelist
           retention-days: 7
 
       - name: Create/Update Release
@@ -202,9 +212,9 @@ jobs:
 
             See [BUILD.md](docs/BUILD.md) for flashing instructions.
           files: |
-            ubuntu/artifacts/rootfs.tar.gz
-            ubuntu/artifacts/*.manifest
-            ubuntu/artifacts/*.filelist
+            artifacts/rootfs.tar.gz
+            artifacts/*.manifest
+            artifacts/*.filelist
           prerelease: false
           make_latest: true
         env:
