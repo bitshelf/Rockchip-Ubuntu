@@ -107,8 +107,8 @@ jobs:
           export BUILD_MODE=local
           export PACKAGE_METHOD=mkupdate
 
-          # Clean old artifacts
-          rm -rf artifacts/
+          # Clean old artifacts (work/ has root-owned files from previous builds)
+          sudo rm -rf artifacts/
           mkdir -p artifacts/
 
           # Run the build (handles seeds, apt repo, ubuntu-image)
