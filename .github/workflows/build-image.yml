@@ -90,71 +90,40 @@ jobs:
         run: |
           set -euo pipefail
           SERIES="${{ steps.select.outputs.series }}"
-          MIRROR="http://ports.ubuntu.com/ubuntu-ports/"
-          SCRIPT_DIR="${{ github.workspace }}"
-          ARTIFACTS="${SCRIPT_DIR}/artifacts"
-          rm -rf "${ARTIFACTS}"
-          mkdir -p "${ARTIFACTS}"
-          LOG="${ARTIFACTS}/ubuntu-image.log"
-          echo "=== ubuntu-image build log ===" > "${LOG}"
-          echo "Series: ${SERIES}" >> "${LOG}"
-          echo "Start: $(date -u)" >> "${LOG}"
+          echo "Series: ${SERIES}"
+          echo "Start: $(date -u)"
 
-          # Select YAML definition
-          YAML="${SCRIPT_DIR}/ubuntu-build-service/image-definition-desktop-noble.yaml"
-          if [[ "${SERIES}" == "questing" ]]; then
-            YAML="${SCRIPT_DIR}/ubuntu-build-service/image-definition-server-questing.yaml"
-          fi
+          # Use build.sh which handles:
+          #   1. Seed merging → /tmp/ubuntu-seeds-git/
+          #   2. Local apt repo → /tmp/ubuntu-local-apt/
+          #   3. ubuntu-image classic call
+          #   4. rootfs.tar.gz output
+          export BOARD=rk3576
+          export SDK_PATH="${{ github.workspace }}"
+          export PROJECT_DIR="${{ github.workspace }}"
+          export UBUNTU_VARIANT=desktop
+          export UBUNTU_SERIES="${SERIES}"
+          export SKIP_SDK_CHECKS=1
+          export BUILD_MODE=local
+          export PACKAGE_METHOD=mkupdate
 
-          # Use Launchpad seeds directly — same approach as successful
-          # arm64-classic.yaml build.  No file:// URL (snap confinement
-          # blocks it) and no local seed merging needed.
-          TMP_YAML="${ARTIFACTS}/image-definition-resolved.yaml"
-          SEED_URL="https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-          sed -e "s|mirror:.*|mirror: \"${MIRROR}\"|" \
-              -e "s|SEED_URL_PLACEHOLDER|${SEED_URL}|" \
-              "${YAML}" > "${TMP_YAML}"
+          # Clean old artifacts
+          rm -rf artifacts/
+          mkdir -p artifacts/
 
-          echo "=== Resolved YAML ==="
-          cat "${TMP_YAML}"
-          echo ""
-
-          echo "=== Network test ===" >> "${LOG}"
-          curl -sI "http://ports.ubuntu.com/ubuntu-ports/" 2>&1 | head -3 >> "${LOG}" || echo "NETWORK FAIL" >> "${LOG}"
-
-          echo "=== Building rootfs (native arm64, single stage) ==="
-          UI_WORKDIR="${ARTIFACTS}/work"
-          mkdir -p "${UI_WORKDIR}"
-          set +e
-          sudo /snap/bin/ubuntu-image classic \
-            --workdir "${UI_WORKDIR}" \
-            "${TMP_YAML}" \
-            -O "${ARTIFACTS}" \
-            --debug 2>&1 | tee -a "${LOG}"
-          UI_EXIT_CODE=${PIPESTATUS[0]}
-          set -e
-          echo "ubuntu-image exit code: ${UI_EXIT_CODE}"
+          # Run the build (handles seeds, apt repo, ubuntu-image)
+          sudo -E bash ubuntu-build-service/build.sh rootfs-only
 
           echo ""
           echo "=== Build output ==="
-          ls -lh "${ARTIFACTS}/" || true
+          ls -lh artifacts/ || true
 
-          if [[ -f "${ARTIFACTS}/rootfs.tar.gz" ]]; then
+          if [[ -f "artifacts/rootfs.tar.gz" ]]; then
             echo "SUCCESS: rootfs.tar.gz created"
-          elif [[ ${UI_EXIT_CODE} -ne 0 ]]; then
-            echo "=== ubuntu-image FAILED (exit code: ${UI_EXIT_CODE}) ==="
-            echo "=== Last 100 lines of log ==="
-            tail -100 "${LOG}" || true
-            {
-              echo "## ubuntu-image Failed (exit code: ${UI_EXIT_CODE})"
-              echo '```'
-              tail -50 "${LOG}" 2>/dev/null
-              echo '```'
-            } >> "${GITHUB_STEP_SUMMARY}"
-            exit 1
           else
-            echo "ERROR: rootfs.tar.gz not found in output!"
-            find "${ARTIFACTS}" -type f -ls 2>/dev/null || true
+            echo "=== Build FAILED ==="
+            echo "=== Last 100 lines of log ==="
+            tail -100 artifacts/ubuntu-image.log 2>/dev/null || true
             exit 1
           fi
 
