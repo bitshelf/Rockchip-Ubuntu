@@ -1,0 +1,27 @@
+# Local configuration and secrets.
+/.env
+/config/hardware-test.env
+
+# Generated build trees and published artifacts.
+/artifacts/
+/build/
+/work/
+
+# Generated image customization payload.
+/config/ubuntu-image/customization
+
+# External or generated binary inputs never belong in this repository.
+*.deb
+*.dtb
+*.dtbo
+*.img
+*.ko
+*.snap
+
+# OV13855 IQ data is an external ISP QA input until hardware tuning is done.
+/overlay/common/etc/iqfiles/ov13855*.json
+
+# Tool output.
+**/__pycache__/
+*.log
+*.tmp

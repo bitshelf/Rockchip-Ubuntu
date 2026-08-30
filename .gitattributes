@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+*.patch text eol=lf
+*.service text eol=lf
+*.sh text eol=lf
+
+*.deb binary
+*.dtb binary
+*.dtbo binary
+*.img binary
+*.ko binary
+*.snap binary
