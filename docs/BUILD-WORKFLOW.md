@@ -21,3 +21,14 @@
 ARM64 手动构建和 CI 应通过 `BUILD_OUTPUT_DIR` 共用约定的产出目录；x86 默认使用
 仓库内的 `build/`。主机和服务准备见 [ARM64-BUILD-HOST.md](ARM64-BUILD-HOST.md)。
 
+## Server rootfs
+
+```bash
+cp .env.example .env       # 按构建主机修改；不要提交 .env
+./build.sh server --check  # 只检查配置和本机依赖
+./build.sh server          # 构建 rootfs
+```
+
+ARM64 主机默认写入 `/var/lib/ubuntu-ci/build`，x86 主机默认写入仓库内的
+`build/`。两者都可用 `.env` 的 `BUILD_OUTPUT_DIR` 覆盖。详细说明和产物定义见
+UBUNTU26-SERVER.md。

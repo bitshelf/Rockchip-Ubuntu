@@ -1,0 +1,57 @@
+Task-Section: user
+Task-Description: Rockchip Ubuntu server
+Task-Seeds: minimal
+
+ * feature: no-follow-recommends
+
+== Server runtime ==
+
+ * apparmor
+ * apport
+ * apt
+ * cloud-init
+ * curl
+ * dbus
+ * netbase
+ * snapd
+ * sudo
+ * sudo-rs
+ * systemd
+ * systemd-resolved
+ * systemd-sysv
+ * udev
+ * unminimize
+ * xxd
+
+== Filesystems and storage ==
+
+ * bcache-tools
+ * btrfs-progs
+ * cryptsetup
+ * e2fsprogs
+ * lvm2
+ * mdadm
+ * multipath-tools
+ * open-iscsi
+ * xfsprogs
+
+== Packages forbidden in product images ==
+
+ * !linux-firmware
+ * !linux-firmware-raspi
+ * !unattended-upgrades
+ * !ubuntu-release-upgrader-core
+ * !thunderbird
+ * !libreoffice
+ * !libreoffice-base
+ * !libreoffice-base-core
+ * !libreoffice-common
+ * !libreoffice-core
+ * !libreoffice-core-nogui
+ * !libreoffice-draw
+ * !libreoffice-gnome
+ * !libreoffice-gtk3
+ * !libreoffice-writer
+ * !libreoffice-calc
+ * !libreoffice-impress
+ * !libreoffice-math

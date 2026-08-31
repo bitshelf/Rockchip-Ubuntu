@@ -1,0 +1,53 @@
+name: ubuntu-server-arm64
+display-name: Ubuntu Server arm64
+revision: 1
+architecture: arm64
+series: resolute
+class: preinstalled
+kernel:
+
+rootfs:
+  components: [main, restricted, universe, multiverse]
+  archive: ubuntu
+  mirror: "@UBUNTU_PORTS_MIRROR@"
+  pocket: updates
+  sources-list-deb822: true
+  seed:
+    urls: ["file://@SEED_CACHE_ROOT@"]
+    branch: resolute
+    vcs: true
+    names: [rockchip-server]
+
+customization:
+  cloud-init:
+    meta-data: |
+      instance-id: ubuntu-resolute-server-arm64
+      local-hostname: ubuntu
+    user-data: |
+      #cloud-config
+      users:
+        - default
+      ssh_pwauth: true
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
+  # ubuntu-image classic requires a core-bearing snap during its preseed
+  # states. Keeping the standard snapd seed is base Server behaviour; later
+  # product policy must be migrated in its own feature.
+  extra-snaps: [{name: snapd}]
+  extra-packages:
+    - {name: bzip2}
+    - {name: ca-certificates}
+    - {name: curl}
+    - {name: device-tree-compiler}
+    - {name: openssh-server}
+    - {name: sudo}
+    - {name: udev}
+
+artifacts:
+  rootfs-tarball: {name: rootfs.tar.gz, compression: gzip}
+  manifest: {name: ubuntu-26.04-server-arm64.manifest}
+  filelist: {name: ubuntu-26.04-server-arm64.filelist}

@@ -15,8 +15,19 @@
 | `desktop` | GNOME | arm64 |
 | `desktop-xfce` | XFCE | arm64 |
 
-## 文档导航
+## 快速开始
 
+先按 [构建主机指南](docs/ARM64-BUILD-HOST.md)准备依赖，并配置匹配的 SDK 输入：
+
+```bash
+cp .env.example .env       # 按本机和平台输入修改；不要提交 .env
+./build.sh server --check  # 检查配置和依赖
+./build.sh server          # 构建 Server 基础 rootfs
+```
+
+完整文件系统合成与可烧录镜像打包见 [构建与交付流程](docs/BUILD-WORKFLOW.md)。
+
+## 文档导航
 
 | 内容 | 文档 |
 | --- | --- |
