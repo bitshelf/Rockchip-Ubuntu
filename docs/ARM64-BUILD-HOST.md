@@ -11,7 +11,8 @@ SDK 的二进制编译和最终固件打包。
 - Docker 数据目录位于真实文件系统；
 - Node.js 可用，用于在 host runner 上执行 Forgejo JavaScript actions；
 - 能访问 Debian/Ubuntu 软件源、Snap Store、Forgejo 镜像和 Runner 下载地址；
-- TCP 3000 和 2222 可供 Forgejo HTTP 与 Git SSH 使用。
+- TCP 3000 可供 Forgejo Web 和 Git HTTP 使用；只有选用 Git SSH
+  时才需要开放 TCP 2222。
 
 APT 软件源默认优先使用清华源，并在新主机上按清华、阿里云、腾讯云顺序探测。
 已有且可访问的这三类国内源会原样保留。Ubuntu ARM64 使用 `ubuntu-ports`，
@@ -82,14 +83,18 @@ BUILD_OUTPUT_DIR=/path/to/shared-build
 Forgejo 数据保存在 `/var/lib/forgejo`，Compose 配置保存在
 `/etc/ubuntu-ci/forgejo-compose.yaml`，管理员凭据保存在
 `/etc/ubuntu-ci/forgejo-admin.env` 且仅 root 可读。脚本成功后会输出 Forgejo Web
-和 Git SSH 地址。
+和 Git 地址。
+
+代码推送、HTTP 认证、workflow 和 CI 编译验证见
+[FORGEJO-CI.md](FORGEJO-CI.md)。
 
 ## 开发与同步
 
 在 ARM64 主机克隆 Forgejo 仓库，并把它作为 Ubuntu 的手动开发目录：
 
 ```bash
-git clone ssh://git@<arm64-host>:2222/ubuntu/ubuntu.git
+FORGEJO_HOST=192.168.1.209
+git clone "http://${FORGEJO_HOST}:3000/ubuntu/ubuntu.git"
 cd ubuntu
 ```
 

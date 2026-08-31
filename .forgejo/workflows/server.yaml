@@ -1,0 +1,26 @@
+name: Ubuntu Server
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-server:
+    runs-on: native-arm64
+    timeout-minutes: 720
+
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@v4
+
+      - name: Source checks
+        run: ./scripts/check-source.sh
+
+      - name: Check build environment
+        run: ./build.sh server --check
+
+      - name: Check SDK platform assets
+        run: ./scripts/stage-sdk-assets.sh --check
+
+      - name: Build server rootfs
+        run: ./build.sh server
