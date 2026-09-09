@@ -97,6 +97,12 @@ update.img 与 OTA image 直接使用 SDK 的 `edit-package-file`、
 `edit-ota-package-file`、`updateimg` 和 `ota-updateimg`，不复制 Rockchip 工具、
 不维护固定分区 mask。见 [OTA.md](OTA.md)。
 
+## Factory image
+
+仓库基于 Rockchip 原生 `parameter.txt` 保留 vendor boot 分区，根据实际 EROFS
+负载计算 rootfs 容量并插入独立 bootfs；最终封装仍由 SDK `updateimg` 完成。见
+[FACTORY-IMAGE.md](FACTORY-IMAGE.md)。
+
 ## U-Boot extlinux/FDTOVERLAYS
 
 Rockchip U-Boot 2017.09 的 extlinux 启动接入、FDT overlay 回移、RKIMG 回退和
