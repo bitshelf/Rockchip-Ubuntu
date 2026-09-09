@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+video4linux_sysfs="${RKAIQ_VIDEO4LINUX_SYSFS:-/sys/class/video4linux}"
+iq_dir="${RKAIQ_IQ_DIR:-/etc/iqfiles}"
+shopt -s nullglob
+
+for name_file in "$video4linux_sysfs"/v4l-subdev*/name; do
+    sensor="$(sed -n 's/^m[0-9][0-9]*_[bf]_\([^[:space:]]*\).*$/\1/p' "$name_file")"
+    [[ -n "$sensor" ]] || continue
+    iq_files=("$iq_dir/${sensor}_"*.json "$iq_dir/${sensor}_"*.xml "$iq_dir/${sensor}_"*.bin)
+    ((${#iq_files[@]} > 0)) && exit 0
+done
+
+echo "No active camera sensor with matching IQ data; rkaiq remains inactive" >&2
+exit 1

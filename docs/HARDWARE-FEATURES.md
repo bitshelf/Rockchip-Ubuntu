@@ -28,6 +28,12 @@ MPP runtime 和验收工具随镜像安装。目标板必须完成同一 H.264 b
 patched v4l-utils、libv4l-rkmpp 和独立 V4L2 QA 见
 [V4L2.md](V4L2.md)。
 
+## ISP 与 OV13855
+
+镜像移植 RKISP/RKAIQ 服务；OV13855 仅作为可替换的摄像头验收示例。基础配置不
+携带板级 IQ，产品定制通过独立提交加入匹配的 overlay、IQ 包和验收条件。真实 30 帧
+摄像头 QA 见 [ISP.md](ISP.md)。
+
 ## ADB 调试
 
 ADB 使用 Ubuntu `adbd` 和通用 USB FunctionFS gadget，保持 root shell 与 host
