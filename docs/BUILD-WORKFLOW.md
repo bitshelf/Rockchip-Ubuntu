@@ -57,3 +57,10 @@ CROSS_BASE_TAG="<ubuntu-base-tag>" ./scripts/cross-build-env.sh --check
 
 完整配置、使用方式和版本迁移步骤见
 [CROSS-COMPILE.md](CROSS-COMPILE.md)。
+
+## U-Boot extlinux/FDTOVERLAYS
+
+Rockchip U-Boot 2017.09 的 extlinux 启动接入、FDT overlay 回移、RKIMG 回退和
+版本移植说明见
+[UBOOT-EXTLINUX-FDTOVERLAYS.md](UBOOT-EXTLINUX-FDTOVERLAYS.md)。该功能
+只交付一个合并补丁，应用前必须对目标 U-Boot 执行 `git apply --check`。
