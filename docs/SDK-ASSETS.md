@@ -1,14 +1,15 @@
-# SDK 板级输入暂存与同步
+# SDK 板级输入暂存、发布与下载
 
-内核 Image、基础 DTB、DT overlay 和选定的内核模块是 SDK 构建产物，不提交到
-Ubuntu Git 仓库。`scripts/stage-sdk-assets.sh` 将这些文件放入 Ubuntu 的
-platform-asset 接口，并生成 SHA256 清单；ARM64 手工构建和 Forgejo Runner
-从同一个 `BUILD_OUTPUT_DIR` 读取它们。
+内核 Image、最终 kernel config、基础 DTB、DT overlay、选定的内核模块和本地
+DEB 是 SDK 构建产物，不提交到 Ubuntu Git 仓库。`scripts/stage-sdk-assets.sh` 将这些文件放入
+Ubuntu 的 platform-asset 接口，并生成 SHA256 清单。它可以直接供 ARM64 native
+构建使用，也可以封装后发布到 Forgejo/GitHub Release，CI 不依赖 SDK 工作树。
 
 ## 在 SDK 主机暂存
 
-先完成 SDK 的 kernel、DTB、overlay 和 kernel-modules 构建。本仓库位于
-SDK 根目录下时，脚本默认读取其父目录的 `output/`：
+先完成 SDK 的 kernel、DTB、overlay、kernel-modules 和需要携带的本地 DEB
+构建。当前清单要求 `output/linux-headers/` 中存在唯一匹配的 ARM64 内核头文件
+包。本仓库位于 SDK 根目录下时，脚本默认读取其父目录的 `output/`：
 
 ```bash
 cd /path/to/ubuntu
@@ -32,38 +33,87 @@ x86 主机默认暂存到 `build/platform-assets/<soc>/`，ARM64 主机默认使
 bundle。需要使用不同清单时通过 `KERNEL_MODULE_CONFIG` 指定。
 重新暂存时可以将旧的完整模块 bundle 原子迁移为只包含选定 KO 的新格式。
 
+最终 SDK `kernel/.config` 会进入 `boot/kernel.config`，并在暂存和 CI 验收时与
+`config/kernel/overlay-root.conf` 比较。EROFS、ext4、OverlayFS 和 initrd 所需
+能力必须为 built-in，不能只检查 defconfig 片段。`modules.builtin` 与
+`modules.builtin.modinfo` 也随 bundle 携带，供 initramfs-tools 识别内建模块；
+它们不是额外驱动集。
+
+本地 DEB 由 `config/local-debs/packages.conf` 的 `DEB_ENTRIES` 选择。每项格式
+是“SDK `output/` 相对文件匹配式｜预期架构｜用途”。目录部分不能使用通配符，
+文件名可以匹配版本变化，但必须恰好找到一个包。暂存脚本读取 DEB control
+metadata，拒绝 amd64/armhf 包进入 ARM64 bundle，并记录包名、版本、架构和用途。
+需要使用其他清单时通过 `LOCAL_DEB_CONFIG` 指定。
+
+仓库需要自行构建的本地包统一使用 `scripts/build-local-debs.sh <key>`，构建条目在
+`config/local-debs/build.conf` 中声明；已有 SDK vendor DEB 和外部 data 文件统一
+使用 `scripts/prepare-local-debs.sh` 汇集。rootfs 通过
+`scripts/install-local-debs.sh` 一次性安装配置选中的包。新增软件包通常只需增加
+构建 recipe 与三份清单条目，不再创建成组的 package-specific 顶层脚本。
+
 每个 bundle 包含：
 
-- `boot/Image`、SDK 输出的 DTB/DTBO 和可选 `extlinux.conf`；
+- `boot/Image`、`boot/kernel.config`、SDK 输出的 DTB/DTBO 和可选
+  `extlinux.conf`；
 - `modules/lib/modules/<kernel-release>/` 下由配置选中的 KO；
-- `kernel-release`、`module-manifest.tsv`、`asset-info` 和 `SHA256SUMS`。
+- 同一版本目录下的 `modules.builtin` 和 `modules.builtin.modinfo`；
+- `debs/` 下由配置选中的本地 Debian 包；
+- `kernel-release`、`module-manifest.tsv`、`local-deb-manifest.tsv`、
+  `asset-info` 和 `SHA256SUMS`。
 
-## 同步到 ARM64 构建主机
+本步骤只建立可校验、可同步的二进制输入，不代表 DEB 已安装进 rootfs。具体
+安装动作应由使用该包的功能提交负责，并核对 manifest 中的包名和版本。
 
-暂存脚本不绑定构建主机、登录用户或传输协议。使用部署环境现有的同步工具，
-把整个 platform-asset 目录复制到 ARM64 主机对应目录。例如使用 rsync 时：
+## 生成发布包
+
+打包脚本先完整执行 `stage-sdk-assets.sh --check`，随后生成所有者和时间戳固定的
+tar.zst 以及配套 SHA256：
 
 ```bash
-ASSET_SOURCE="/path/to/local/platform-assets/<soc>"
-ASSET_DESTINATION="<build-host>:<remote-platform-asset-directory>"
-rsync -a "${ASSET_SOURCE}/" "${ASSET_DESTINATION}/"
+./scripts/pack-platform-assets.sh \
+  "$PWD/artifacts/platform-assets-${SOC_MODEL}.tar.zst"
 ```
 
-目标目录是构建主机 `BUILD_OUTPUT_DIR` 下的
-`platform-assets/<soc>/`。它不依赖登录用户的 home 或 `/userdata`；
-`ubuntu-ci` Runner 必须对目标目录具有读取和执行权限。
+Release tag 必须是不可变版本。发布脚本发现同名资产时直接失败，不覆盖旧包：
 
-同步完成后，在目标目录执行 `sha256sum -c SHA256SUMS`。同步命令只传输该
-platform-asset bundle，不同步 Ubuntu 源码目录或其他构建产物。
+```bash
+ASSET_PROVIDER=github \
+ASSET_REPOSITORY=owner/repository \
+ASSET_TAG=platform-assets-<version> \
+ASSET_TOKEN="<release-token>" \
+PLATFORM_ASSET_BUNDLE="$PWD/artifacts/platform-assets-${SOC_MODEL}.tar.zst" \
+./scripts/publish-platform-assets.sh
+```
+
+Forgejo 还需设置 `ASSET_SERVER_URL`。两种 provider 都使用对应 Release API；
+token 只由 CI secret 或当前 shell 提供，不写入 `.env`、日志或 bundle。
+
+## ARM64 native 与 CI 下载
+
+ARM64 手工构建可以继续直接使用
+`/var/lib/ubuntu-ci/build/platform-assets/<soc>/`。也可以和 GitHub/Forgejo CI 一样
+从 Release 下载：
+
+```bash
+SOC_MODEL="<soc>" \
+PLATFORM_ASSET_BUNDLE_URL="https://server/owner/repo/releases/download/<tag>/platform-assets-<soc>.tar.zst" \
+./scripts/fetch-platform-assets.sh
+```
+
+公开 Release 自动下载同 URL 的 `.sha256`；也可显式提供
+`PLATFORM_ASSET_BUNDLE_SHA256`。私有仓库通过 secret 设置完整的
+`PLATFORM_ASSET_AUTH_HEADER`。下载脚本先验证压缩包 SHA256、成员路径和内部
+`SHA256SUMS`，然后原子替换 `platform-assets/<soc>/`。
 
 ## CI 使用
 
-Forgejo workflow 在 rootfs 构建前执行：
+Forgejo 和 GitHub workflow 在 rootfs 构建前执行下载或已有资产检查：
 
 ```bash
+./scripts/fetch-platform-assets.sh
 ./scripts/stage-sdk-assets.sh --check
 ```
 
-因此 Runner 使用的 `BUILD_OUTPUT_DIR` 必须与同步目标一致。CI 不从 Git 下载
-这些二进制，也不会把它们加入仓库；缺失、版本目录不一致或 SHA256 改变都会在
-构建开始前失败。
+Forgejo native runner 未配置 URL 时可用 `--if-configured` 复用共享输出目录；
+GitHub CI 要求配置发布 URL。二进制仍不进入 Git。详细变量和两套 workflow 见
+[CI-ASSETS.md](CI-ASSETS.md)。
