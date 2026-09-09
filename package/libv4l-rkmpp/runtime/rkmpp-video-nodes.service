@@ -1,0 +1,13 @@
+[Unit]
+Description=Create virtual video endpoints for libv4l-rkmpp
+DefaultDependencies=no
+After=local-fs.target
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'umask 000; printf "dec\n" > /dev/video-dec0; printf "enc\n" > /dev/video-enc0; chmod 0666 /dev/video-dec0 /dev/video-enc0'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

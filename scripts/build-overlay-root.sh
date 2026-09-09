@@ -242,6 +242,7 @@ install -d -m 0755 "$rootfs/boot" "$rootfs/var/lib/overlay-root"
 "${SCRIPT_DIR}/install-libmali.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-rga.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-mpp.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
+"${SCRIPT_DIR}/install-local-debs.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 
 module_source="${PLATFORM_ASSET_DIR}/modules/lib/modules/${kernel_release}"
 module_target="$rootfs/lib/modules/${kernel_release}"

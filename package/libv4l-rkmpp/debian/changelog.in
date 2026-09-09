@@ -1,0 +1,5 @@
+libv4l-rkmpp (1.7.1-1+rockchip.@SERIES@.1) @SERIES@; urgency=medium
+
+  * Build the Rockchip V4L2-to-MPP plugin from the SDK source archive.
+
+ -- Ubuntu image CI <root@localhost>  Thu, 03 Sep 2026 10:00:00 +0800
