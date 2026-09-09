@@ -238,6 +238,7 @@ install -D -m 0644 \
     "${PROJECT_DIR}/config/overlay-root/initramfs/conf.d/overlay-root" \
     "$rootfs/etc/initramfs-tools/conf.d/overlay-root"
 install -d -m 0755 "$rootfs/boot" "$rootfs/var/lib/overlay-root"
+"${SCRIPT_DIR}/install-adb.sh" "$rootfs"
 
 module_source="${PLATFORM_ASSET_DIR}/modules/lib/modules/${kernel_release}"
 module_target="$rootfs/lib/modules/${kernel_release}"
@@ -315,6 +316,9 @@ platform.assets.sha256=$(sha256sum "${PLATFORM_ASSET_DIR}/SHA256SUMS" | awk '{pr
 initramfs.sha256=$(sha256sum "${work_dir}/initrd.img" | awk '{print $1}')
 bootfs.image=$(basename "$BOOTFS_OUTPUT")
 userdata.image=$(basename "$USERDATA_IMAGE")
+adb.transport=usb-functionfs
+adb.network.namespace=host
+adb.shell.uid=0
 EOF
 chmod 0644 "$EROFS_ROOTFS_IMAGE" "$USERDATA_IMAGE" \
     "${EROFS_ROOTFS_IMAGE}.sha256" "${USERDATA_IMAGE}.sha256" \

@@ -1,0 +1,92 @@
+#!/bin/sh
+set -eu
+
+gadget=/sys/kernel/config/usb_gadget/rockchip
+config="$gadget/configs/b.1"
+function="$gadget/functions/ffs.adb"
+ffs=/dev/usb-ffs/adb
+
+log()
+{
+    echo "rk-adbd-gadget: $*" >&2
+}
+
+unbind()
+{
+    if [ -r "$gadget/UDC" ] && [ -n "$(cat "$gadget/UDC")" ]; then
+        printf '' >"$gadget/UDC" || true
+    fi
+}
+
+reset()
+{
+    unbind
+    rm -f "$config/f-ffs.adb"
+    if mountpoint -q "$ffs"; then
+        umount "$ffs"
+    fi
+    rmdir "$ffs" 2>/dev/null || true
+    rmdir "$function" 2>/dev/null || true
+    rmdir "$config/strings/0x409" 2>/dev/null || true
+    rmdir "$config" 2>/dev/null || true
+    rmdir "$gadget/strings/0x409" 2>/dev/null || true
+    rmdir "$gadget" 2>/dev/null || true
+}
+
+setup()
+{
+    reset
+    mountpoint -q /sys/kernel/config ||
+        mount -t configfs none /sys/kernel/config
+
+    mkdir -p "$gadget/strings/0x409" "$config/strings/0x409"
+    printf '0x2207\n' >"$gadget/idVendor"
+    printf '0x0006\n' >"$gadget/idProduct"
+    printf '0x0310\n' >"$gadget/bcdDevice"
+    printf '0x0200\n' >"$gadget/bcdUSB"
+    printf 'Rockchip\n' >"$gadget/strings/0x409/manufacturer"
+    printf 'Ubuntu ADB\n' >"$gadget/strings/0x409/product"
+    sha256sum /etc/machine-id | cut -d' ' -f1 \
+        >"$gadget/strings/0x409/serialnumber"
+    printf 'ADB\n' >"$config/strings/0x409/configuration"
+    printf '500\n' >"$config/MaxPower"
+
+    mkdir -p "$function" "$ffs"
+    mount -t functionfs -o uid=0,gid=0 adb "$ffs"
+    ln -s "$function" "$config/f-ffs.adb"
+}
+
+activate()
+{
+    attempt=0
+    while [ ! -e "$ffs/ep1" ]; do
+        attempt=$((attempt + 1))
+        if [ "$attempt" -ge 100 ]; then
+            log "timed out waiting for adbd FunctionFS descriptors"
+            return 1
+        fi
+        sleep 0.05
+    done
+
+    found=0
+    for path in /sys/class/udc/*; do
+        [ -e "$path" ] || continue
+        found=1
+        udc=${path##*/}
+        if printf '%s\n' "$udc" >"$gadget/UDC"; then
+            log "bound to UDC $udc"
+            return 0
+        fi
+        log "UDC $udc rejected the gadget; trying the next controller"
+        unbind
+    done
+    [ "$found" -eq 1 ] || log "no USB device controller is available"
+    return 1
+}
+
+case "${1:-}" in
+    setup) setup ;;
+    activate) activate ;;
+    reset) reset ;;
+    *) echo "usage: $0 {setup|activate|reset}" >&2; exit 2 ;;
+esac

@@ -34,3 +34,7 @@ The immutable-root contract is split by responsibility:
   acceptance contract;
 - `overlay-root/` owns the initramfs policy, fstab and persistent userdata
   identity. It never formats an unrecognized device during boot.
+
+`adb/` owns the common USB FunctionFS gadget and service policy. adbd stays in
+the host network namespace and runs as root so ADB and serial diagnostics see
+the same board state.

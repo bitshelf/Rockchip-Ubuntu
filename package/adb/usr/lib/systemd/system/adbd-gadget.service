@@ -1,0 +1,15 @@
+[Unit]
+Description=Prepare the USB gadget for Android Debug Bridge
+Documentation=file:/usr/share/doc/adbd/README.adbd
+DefaultDependencies=no
+Wants=sys-kernel-config.mount
+After=local-fs.target sys-kernel-config.mount
+Before=adbd.service
+PartOf=adbd.service
+
+[Service]
+Type=oneshot
+ExecStartPre=-/usr/libexec/rk-adbd-gadget reset
+ExecStart=/usr/libexec/rk-adbd-gadget setup
+ExecStop=-/usr/libexec/rk-adbd-gadget reset
+RemainAfterExit=yes
