@@ -1,0 +1,29 @@
+From: Peter Seiderer <ps.report@gmx.net>
+Subject: tests: skip nouveau tests for static builds
+
+The nouveau tests require shared-library behavior and fail when libdrm is
+configured as a static-only build. Keep the test selection aligned with the
+selected Meson library type.
+
+Signed-off-by: Peter Seiderer <ps.report@gmx.net>
+---
+ tests/meson.build | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/tests/meson.build b/tests/meson.build
+index ac9e66b..ece003b 100644
+--- a/tests/meson.build
++++ b/tests/meson.build
+@@ -40,8 +40,11 @@ endif
+ if with_etnaviv
+   subdir('etnaviv')
+ endif
++lib_type = get_option('default_library')
+ if with_nouveau
+-  subdir('nouveau')
++  if lib_type != 'static'
++    subdir('nouveau')
++  endif
+ endif
+ 
+ drmsl = executable(

@@ -1,0 +1,140 @@
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Subject: modetest: query only requested resources
+
+Avoid querying and freeing every KMS object when the command asks for only one
+resource class. This materially shortens diagnostics on display pipelines with
+slow connector and property queries while preserving the full query for modeset
+and property operations.
+---
+ tests/modetest/modetest.c | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/tests/modetest/modetest.c b/tests/modetest/modetest.c
+index 24c0e2d..55b84f7 100644
+--- a/tests/modetest/modetest.c
++++ b/tests/modetest/modetest.c
+@@ -73,6 +73,15 @@ static enum util_fill_pattern secondary_fill = UTIL_PATTERN_TILES;
+ static unsigned long pattern_seed = 0;
+ static drmModeModeInfo user_mode;
+ 
++static int encoders;
++static int connectors;
++static int crtcs;
++static int planes;
++static int fbs;
++static int needs_all;
++
++#define needs_resource(type) (needs_all || type##s)
++
+ struct crtc {
+ 	drmModeCrtc *crtc;
+ 	drmModeObjectProperties *props;
+@@ -497,7 +506,7 @@ static void dump_crtcs(struct device *dev)
+ 	printf("\n");
+ }
+ 
+-static void dump_framebuffers(struct device *dev)
++static void dump_fbs(struct device *dev)
+ {
+ 	drmModeFB *fb;
+ 	int i;
+@@ -566,6 +575,7 @@ static void free_resources(struct resources *res)
+ 		return;
+ 
+ #define free_resource(_res, type, Type)					\
++	if (needs_resource(type))						\
+ 	do {									\
+ 		if (!(_res)->type##s)						\
+ 			break;							\
+@@ -578,6 +588,7 @@ static void free_resources(struct resources *res)
+ 	} while (0)
+ 
+ #define free_properties(_res, type)					\
++	if (needs_resource(type))						\
+ 	do {									\
+ 		for (i = 0; i < (int)(_res)->count_##type##s; ++i) {	\
+ 			unsigned int j;								\
+@@ -594,6 +605,7 @@ static void free_resources(struct resources *res)
+ 	free_properties(res, connector);
+ 	free_properties(res, crtc);
+ 
++	if (needs_resource(connector))
+ 	for (i = 0; i < res->count_connectors; i++)
+ 		free(res->connectors[i].name);
+ 
+@@ -642,6 +654,7 @@ static struct resources *get_resources(struct device *dev)
+     }
+ 
+ #define get_resource(_res, __res, type, Type)					\
++	if (needs_resource(type))						\
+ 	do {									\
+ 		for (i = 0; i < (int)(_res)->count_##type##s; ++i) {			\
+ 			uint32_t type##id = (__res)->type##s[i];			\
+@@ -662,6 +675,7 @@ static struct resources *get_resources(struct device *dev)
+ 	drmModeFreeResources(_res);
+ 
+ 	/* Set the name of all connectors based on the type name and the per-type ID. */
++	if (needs_resource(connector))
+ 	for (i = 0; i < res->count_connectors; i++) {
+ 		struct connector *connector = &res->connectors[i];
+ 		drmModeConnector *conn = connector->connector;
+@@ -675,6 +689,7 @@ static struct resources *get_resources(struct device *dev)
+ 	}
+ 
+ #define get_properties(_res, type, Type)					\
++	if (needs_resource(type))						\
+ 	do {									\
+ 		for (i = 0; i < (int)(_res)->count_##type##s; ++i) {	\
+ 			struct type *obj = &res->type##s[i];			\
+@@ -702,6 +717,7 @@ static struct resources *get_resources(struct device *dev)
+ 	get_properties(res, crtc, CRTC);
+ 	get_properties(res, connector, CONNECTOR);
+ 
++	if (needs_resource(crtc))
+ 	for (i = 0; i < res->count_crtcs; ++i)
+ 		res->crtcs[i].mode = &res->crtcs[i].crtc->mode;
+ 
+@@ -2198,7 +2214,6 @@ int main(int argc, char **argv)
+ 	struct device dev;
+ 
+ 	int c;
+-	int encoders = 0, connectors = 0, crtcs = 0, planes = 0, framebuffers = 0;
+ 	int drop_master = 0;
+ 	int test_vsync = 0;
+ 	int test_cursor = 0;
+@@ -2243,7 +2258,7 @@ int main(int argc, char **argv)
+ 			encoders = 1;
+ 			break;
+ 		case 'f':
+-			framebuffers = 1;
++			fbs = 1;
+ 			break;
+ 		case 'F':
+ 			parse_fill_patterns(optarg);
+@@ -2322,7 +2337,7 @@ int main(int argc, char **argv)
+ 
+ 	/* Dump all the details when no* arguments are provided. */
+ 	if (!args)
+-		encoders = connectors = crtcs = planes = framebuffers = 1;
++		encoders = connectors = crtcs = planes = fbs = 1;
+ 
+ 	if (test_vsync && !count && !set_preferred) {
+ 		fprintf(stderr, "page flipping requires at least one -s or -r option.\n");
+@@ -2333,6 +2348,8 @@ int main(int argc, char **argv)
+ 		return -1;
+ 	}
+ 
++	needs_all = set_preferred || count || prop_count || plane_count;
++
+ 	dev.fd = util_open(device, module);
+ 	if (dev.fd < 0)
+ 		return -1;
+@@ -2361,7 +2378,7 @@ int main(int argc, char **argv)
+ 	dump_resource(&dev, connectors);
+ 	dump_resource(&dev, crtcs);
+ 	dump_resource(&dev, planes);
+-	dump_resource(&dev, framebuffers);
++	dump_resource(&dev, fbs);
+ 
+ 	if (dev.use_atomic)
+ 		dev.req = drmModeAtomicAlloc();
