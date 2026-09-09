@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+profile=
+output=
+usage() { echo "usage: rockchip-test qa <server|desktop> [output.json]"; }
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+[[ "${1:-}" == --profile ]] || { usage >&2; exit 2; }
+profile="${2:-}"
+shift 2
+[[ "$profile" == server || "$profile" == desktop ]] || die "invalid profile: $profile"
+(( $# <= 1 )) || { usage >&2; exit 2; }
+output="${1:-/var/lib/rockchip-test/results/${profile}-$(date -u +%Y%m%dT%H%M%SZ).json}"
+[[ "$output" == /* && "$output" != *[[:space:]]* ]] || die "output must be an absolute path without whitespace"
+
+for tool in awk findmnt uname; do
+    command -v "$tool" >/dev/null || die "missing QA dependency: $tool"
+done
+
+declare -a passed=() failed=() skipped=()
+pass() { passed+=("$1"); printf 'PASS %s\n' "$1"; }
+fail() { failed+=("$1"); printf 'FAIL %s\n' "$1" >&2; }
+skip() { skipped+=("$1"); printf 'SKIP %s\n' "$1"; }
+check() {
+    local name="$1"
+    shift
+    if "$@"; then pass "$name"; else fail "$name"; fi
+}
+
+is_supported_os() {
+    local id
+    id="$(. /etc/os-release; printf '%s' "${ID:-}")"
+    [[ "$id" == ubuntu || "$id" == debian ]]
+}
+is_rockchip() {
+    tr '\0' '\n' </proc/device-tree/compatible 2>/dev/null | grep -qi rockchip
+}
+has_drm_render() { compgen -G '/dev/dri/renderD*' >/dev/null; }
+has_npu() { compgen -G '/dev/dri/by-path/*npu*-render' >/dev/null || compgen -G '/sys/class/devfreq/*npu*' >/dev/null; }
+has_video() { compgen -G '/dev/video[0-9]*' >/dev/null; }
+has_audio() { [[ -r /proc/asound/cards ]] && grep -Eq '^[[:space:]]*[0-9]+[[:space:]]' /proc/asound/cards; }
+has_network() { find /sys/class/net -mindepth 1 -maxdepth 1 ! -name lo -print -quit | grep -q .; }
+has_adb_host_network() {
+    local pid host_ns adbd_ns
+    systemctl is-active --quiet adbd.service || return 1
+    pid="$(systemctl show -p MainPID --value adbd.service 2>/dev/null || true)"
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+    host_ns="$(readlink /proc/1/ns/net 2>/dev/null || true)"
+    adbd_ns="$(readlink "/proc/${pid}/ns/net" 2>/dev/null || true)"
+    [[ -n "$host_ns" && "$adbd_ns" == "$host_ns" ]]
+}
+server_policy() { ! systemctl is-active --quiet display-manager.service 2>/dev/null; }
+desktop_policy() { systemctl is-active --quiet display-manager.service 2>/dev/null; }
+
+check os.supported is_supported_os
+check architecture.arm64 test "$(uname -m)" = aarch64
+check hardware.rockchip is_rockchip
+check filesystem.root-mounted findmnt -n /
+check device.drm-render has_drm_render
+check device.npu has_npu
+check device.video has_video
+check device.audio has_audio
+check device.network has_network
+check device.adb-host-network has_adb_host_network
+if [[ "$(findmnt -n -o FSTYPE /)" == overlay ]]; then
+    pass filesystem.overlay-root
+else
+    skip filesystem.overlay-root
+fi
+if [[ "$profile" == server ]]; then
+    check profile.server-headless server_policy
+    skip desktop.display
+    skip desktop.chromium
+else
+    check profile.desktop-display-manager desktop_policy
+    check desktop.chromium command -v chromium
+fi
+
+install -d -m 0755 "$(dirname "$output")"
+result=pass
+(( ${#failed[@]} == 0 )) || result=fail
+json_string() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    printf '"%s"' "$value"
+}
+json_array() {
+    local separator= item
+    printf '['
+    for item in "$@"; do
+        printf '%s' "$separator"
+        json_string "$item"
+        separator=,
+    done
+    printf ']'
+}
+model="$(tr -d '\0' </proc/device-tree/model 2>/dev/null || true)"
+{
+    printf '{"schema":"rockchip-test-qa-v1","profile":'
+    json_string "$profile"
+    printf ',"result":'
+    json_string "$result"
+    printf ',"model":'
+    json_string "$model"
+    printf ',"kernel":'
+    json_string "$(uname -r)"
+    printf ',"passed":'
+    json_array "${passed[@]}"
+    printf ',"failed":'
+    json_array "${failed[@]}"
+    printf ',"skipped":'
+    json_array "${skipped[@]}"
+    printf '}\n'
+} >"$output"
+echo "ROCKCHIP_TEST_QA=$result"
+echo "ROCKCHIP_TEST_EVIDENCE=$output"
+[[ "$result" == pass ]]

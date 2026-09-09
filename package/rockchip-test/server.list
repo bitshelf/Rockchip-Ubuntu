@@ -1,0 +1,11 @@
+# Tests applicable to a headless Server image.
+system
+cpu
+ddr
+gpu-offscreen
+npu
+camera
+video-headless
+audio
+network
+adb

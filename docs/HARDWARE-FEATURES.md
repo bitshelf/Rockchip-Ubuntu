@@ -40,6 +40,12 @@ GStreamer 主体使用 Ubuntu 26 软件源，SDK 仅提供 Rockchip MPP 插件�
 100 帧 NV12 完成硬件编码、H.264 解析和硬件解码，见
 [GSTREAMER.md](GSTREAMER.md)。
 
+## Rockchip 镜像测试
+
+SDK `external/rockchip-test/` 可封装为默认不集成的 `rockchip-test`
+deb。Server 与 Desktop 使用独立 QA profile，危险和长时间 vendor 测试不会被自动
+执行。构建与目标板用法见 [ROCKCHIP-TEST.md](ROCKCHIP-TEST.md)。
+
 ## ADB 调试
 
 ADB 使用 Ubuntu `adbd` 和通用 USB FunctionFS gadget，保持 root shell 与 host
