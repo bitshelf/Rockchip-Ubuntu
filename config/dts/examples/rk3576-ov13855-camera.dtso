@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* MYD-LR3576 CAM3 OV13855 -> CSI2 DPHY3 -> rkcif -> rkisp -> rkvpss. */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "rockchip,rk3576-evb1-v10", "rockchip,rk3576";
+};
+
+/* CAM3 shares its lane and control GPIOs with the three Jaguar inputs. */
+&jaguar_1 { status = "disabled"; };
+&jaguar_2 { status = "disabled"; };
+&jaguar_3 { status = "disabled"; };
+
+&vcc_camera3 { status = "okay"; };
+&csi2_dphy3 { status = "okay"; };
+
+/* disable-DSI leaves the DSI route off. Camera DPHY3 still needs this PHY. */
+&mipidcphy0 { status = "okay"; };
+&csi2_dphy0_hw { status = "okay"; };
+&csi2_dphy1_hw { status = "okay"; };
+&i2c8 { status = "okay"; };
+&mipi3_csi2 { status = "okay"; };
+&rkcif { status = "okay"; };
+&rkcif_mipi_lvds3 { status = "okay"; };
+&rkcif_mmu { status = "okay"; };
+
+&mipi_dphy3_in_n4 {
+	remote-endpoint = <&ov13855_out>;
+	data-lanes = <1 2 3 4>;
+};
+
+&i2c8 {
+	ov13855: ov13855@36 {
+		status = "okay";
+		compatible = "ovti,ov13855";
+		reg = <0x36>;
+		clocks = <&clk_camera3_fixed>;
+		clock-names = "xvclk";
+		clock-frequency = <24000000>;
+		power-domains = <&power 15>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&camera3_default_pins>;
+		/* The driver ends power_on with both logical values asserted. */
+		reset-gpios = <&gpio3 30 0>;
+		pwdn-gpios = <&gpio3 31 0>;
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
+		port {
+			ov13855_out: endpoint {
+				remote-endpoint = <&mipi_dphy3_in_n4>;
+				data-lanes = <1 2 3 4>;
+			};
+		};
+	};
+};
+
+&rkcif_mipi_lvds3_sditf {
+	status = "okay";
+	port {
+		mipi_lvds3_sditf: endpoint {
+			remote-endpoint = <&isp_vir2_in0>;
+		};
+	};
+};
+
+&rkisp { status = "okay"; };
+&rkisp_mmu { status = "okay"; };
+&rkisp_vir2 {
+	status = "okay";
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		isp_vir2_in0: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&mipi_lvds3_sditf>;
+		};
+	};
+};
+&rkisp_vir2_sditf { status = "okay"; };
+&rkvpss { status = "okay"; };
+&rkvpss_mmu { status = "okay"; };
+&rkvpss_vir2 { status = "okay"; };

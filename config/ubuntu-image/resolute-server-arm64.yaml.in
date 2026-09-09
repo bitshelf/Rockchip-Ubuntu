@@ -61,6 +61,7 @@ customization:
     - {name: openssh-server}
     - {name: sudo}
     - {name: udev}
+    - {name: v4l-utils}
 
 artifacts:
   rootfs-tarball: {name: rootfs.tar.gz, compression: gzip}
