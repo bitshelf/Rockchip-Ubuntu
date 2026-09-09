@@ -43,3 +43,17 @@ SHA256 清单，再同步到 ARM64 手工构建和 Forgejo CI 共用的构建输
 ```
 
 目录布局、同步和验收方法见 [SDK-ASSETS.md](SDK-ASSETS.md)。
+
+## x86 交叉编译 ARM64
+
+在 x86_64 主机使用 GNU AArch64 交叉工具链。宿主机可以是 Debian 或 Ubuntu，
+目标 Ubuntu 基础版本由
+`.env` 的 `CROSS_BASE_TAG` 选择，不固化在脚本中。
+
+```bash
+CROSS_BASE_TAG="<ubuntu-base-tag>" ./scripts/cross-build-env.sh --prepare
+CROSS_BASE_TAG="<ubuntu-base-tag>" ./scripts/cross-build-env.sh --check
+```
+
+完整配置、使用方式和版本迁移步骤见
+[CROSS-COMPILE.md](CROSS-COMPILE.md)。

@@ -15,3 +15,6 @@ The Server rootfs feature currently owns:
 
 Board boot policy and later product features must not be added to the Server
 definition until their own feature is migrated.
+
+Cross-build release selection stays in the untracked `.env`; it is not encoded
+in product configuration.
