@@ -35,14 +35,17 @@ ARM64 主机默认写入 `/var/lib/ubuntu-ci/build`，x86 主机默认写入仓�
 
 ## SDK 板级输入
 
-内核 Image、DTB、DT overlay 和 modules 不进入 Git。先在 SDK 主机暂存并生成
-SHA256 清单，再同步到 ARM64 手工构建和 Forgejo CI 共用的构建输出目录：
+内核 Image、DTB、DT overlay、modules 和 vendor DEB 不进入 Git。先在 SDK 主机
+暂存并生成 SHA256 清单，再封装为 Forgejo/GitHub Release 资产；ARM64 native、
+Forgejo 和 GitHub CI 使用相同下载/校验接口：
 
 ```bash
 ./scripts/stage-sdk-assets.sh
+./scripts/pack-platform-assets.sh "$PWD/artifacts/platform-assets-${SOC_MODEL}.tar.zst"
 ```
 
-目录布局、同步和验收方法见 [SDK-ASSETS.md](SDK-ASSETS.md)。
+目录布局与发布方法见 [SDK-ASSETS.md](SDK-ASSETS.md)，双 CI 变量见
+[CI-ASSETS.md](CI-ASSETS.md)。
 
 ## 独立 bootfs
 

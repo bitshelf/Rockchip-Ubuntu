@@ -132,14 +132,15 @@ jobs:
         run: ./build.sh server
 ```
 
-Forgejo 的原生 workflow 目录是 `.forgejo/workflows`；不使用 GitHub Actions。
-Runner 从 systemd 服务继承 `BUILD_OUTPUT_DIR`，因此 CI 与 ARM64 手工构建
-共用 `/var/lib/ubuntu-ci/build`。
+Forgejo 的原生 workflow 目录是 `.forgejo/workflows`；GitHub 对应文件位于
+`.github/workflows`。Runner 从 systemd 服务继承 `BUILD_OUTPUT_DIR`，因此 CI 与
+ARM64 手工构建仍可共用 `/var/lib/ubuntu-ci/build`。
 
-SDK 的 kernel/DTB/modules 输入必须先按 [SDK-ASSETS.md](SDK-ASSETS.md)
-暂存并同步到同一目录；workflow 只校验外部 bundle，不把二进制提交到 Git。
+SDK 的 kernel/DTB/modules/DEB 输入按 [SDK-ASSETS.md](SDK-ASSETS.md) 暂存；
+workflow 可以复用同一目录，也可以下载 Forgejo/GitHub Release。二进制不提交到
+Git，双 CI 配置见 [CI-ASSETS.md](CI-ASSETS.md)。
 
-## 查看 CI 状态
+## 查看 CI 状态与下载 rootfs
 
 通过 Forgejo 页面的 `ubuntu/ubuntu -> Actions` 查看任务日志，或在 209
 上查看 Runner 状态：
@@ -154,6 +155,12 @@ CI 构建产出保存在：
 ```text
 /var/lib/ubuntu-ci/build
 ```
+
+构建通过后，打开对应 workflow run，在页面的 Artifacts 区域下载
+`ubuntu-*-server-arm64-<run-id>`。其中包含 rootfs、SHA256、manifest、filelist、
+build-info 和 QA JSON。上传前会重新验证 rootfs SHA256；由于 rootfs 已经压缩，
+artifact action 禁用二次压缩以减少 ARM64 CPU 和上传等待时间。保留期限使用
+Forgejo 实例策略，不在仓库中写死。
 
 编译成功后检查 Server rootfs、manifest、filelist 和 SHA256 文件：
 

@@ -19,9 +19,15 @@ for directory in config docs scripts tests/host; do
 done
 
 workflow_count=0
+forgejo_workflow_count=0
+github_workflow_count=0
 while IFS= read -r -d '' workflow; do
     (( workflow_count += 1 ))
-    [[ -s "$workflow" ]] || fail "empty Forgejo workflow: $workflow"
+    [[ "$workflow" == "${PROJECT_DIR}/.forgejo/"* ]] &&
+        (( forgejo_workflow_count += 1 ))
+    [[ "$workflow" == "${PROJECT_DIR}/.github/"* ]] &&
+        (( github_workflow_count += 1 ))
+    [[ -s "$workflow" ]] || fail "empty CI workflow: $workflow"
     grep -Eq '^name:[[:space:]]+[^[:space:]]' "$workflow" ||
         fail "Forgejo workflow has no name: $workflow"
     grep -Eq '^on:' "$workflow" ||
@@ -31,11 +37,12 @@ while IFS= read -r -d '' workflow; do
     grep -Eq '^[[:space:]]+runs-on:[[:space:]]+[^[:space:]]' "$workflow" ||
         fail "Forgejo workflow has no runner label: $workflow"
 done < <(
-    find "${PROJECT_DIR}/.forgejo/workflows" -maxdepth 1 -type f \
+    find "${PROJECT_DIR}/.forgejo/workflows" \
+        "${PROJECT_DIR}/.github/workflows" -maxdepth 1 -type f \
         \( -name '*.yaml' -o -name '*.yml' \) -print0 2>/dev/null | sort -z
 )
-(( workflow_count > 0 )) || fail "missing Forgejo workflow"
-[[ ! -d "${PROJECT_DIR}/.github/workflows" ]] ||
-    fail "GitHub Actions workflows are not used by this repository"
+(( workflow_count > 0 )) || fail "missing CI workflow"
+(( forgejo_workflow_count > 0 )) || fail "missing Forgejo workflow"
+(( github_workflow_count > 0 )) || fail "missing GitHub workflow"
 
 echo "Repository contract checks passed"

@@ -16,6 +16,9 @@ jobs:
       - name: Source checks
         run: ./scripts/check-source.sh
 
+      - name: Fetch published platform assets when configured
+        run: ./scripts/fetch-platform-assets.sh --if-configured
+
       - name: Check build environment
         run: ./build.sh server --check
 
@@ -24,6 +27,18 @@ jobs:
 
       - name: Build server rootfs
         run: ./build.sh server
+
+      - name: Verify server rootfs artifacts
+        id: rootfs-artifacts
+        run: ./scripts/export-rootfs-artifacts.sh
+
+      - name: Upload server rootfs
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: ${{ steps.rootfs-artifacts.outputs.name }}-${{ github.run_id }}
+          path: ${{ steps.rootfs-artifacts.outputs.paths }}
+          if-no-files-found: error
+          compression-level: 0
 
       - name: Build EROFS lower and OverlayFS boot artifacts
         run: ./build.sh overlay-root

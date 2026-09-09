@@ -1,0 +1,45 @@
+name: Ubuntu Server
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-server:
+    runs-on: ${{ vars.ARM64_RUNNER_LABEL || 'ubuntu-24.04-arm' }}
+    timeout-minutes: 720
+    env:
+      BUILD_OUTPUT_DIR: ${{ github.workspace }}/build
+      SOC_MODEL: ${{ vars.SOC_MODEL }}
+      BOOTFS_BASE_DTB: ${{ vars.BOOTFS_BASE_DTB }}
+      PLATFORM_ASSET_BUNDLE_URL: ${{ vars.PLATFORM_ASSET_BUNDLE_URL }}
+      PLATFORM_ASSET_BUNDLE_SHA256: ${{ vars.PLATFORM_ASSET_BUNDLE_SHA256 }}
+      PLATFORM_ASSET_AUTH_HEADER: ${{ secrets.PLATFORM_ASSET_AUTH_HEADER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Source checks
+        run: ./scripts/check-source.sh
+
+      - name: Fetch verified platform assets
+        run: ./scripts/fetch-platform-assets.sh
+
+      - name: Check build environment
+        run: ./build.sh server --check
+
+      - name: Build server rootfs
+        run: ./build.sh server
+
+      - name: Verify server rootfs artifacts
+        id: rootfs-artifacts
+        run: ./scripts/export-rootfs-artifacts.sh
+
+      - name: Upload server rootfs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.rootfs-artifacts.outputs.name }}-${{ github.run_id }}
+          path: ${{ steps.rootfs-artifacts.outputs.paths }}
+          if-no-files-found: error
+          compression-level: 0

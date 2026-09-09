@@ -265,6 +265,8 @@ enable_source_repositories() {
 install_host_packages() {
     local packages
 
+    [[ -d /tmp && ! -L /tmp ]] || die "/tmp must be a real directory"
+    chmod 1777 /tmp
     export DEBIAN_FRONTEND=noninteractive
     export TMPDIR=/tmp
     apt-get update
@@ -670,6 +672,9 @@ EOF
 check_host() {
     local distribution
 
+    [[ "$(stat -c %a /tmp)" == 1777 ]] || die "/tmp mode must be 1777"
+    sudo -u "$CI_USER" sh -c 'probe=$(mktemp) && rm -f -- "$probe"' ||
+        die "CI runner cannot create temporary files"
     [[ -d /sys/kernel/security/apparmor ]] ||
         die "AppArmor securityfs is unavailable"
     systemctl is-active --quiet apparmor.service || die "AppArmor is not active"
