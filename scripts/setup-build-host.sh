@@ -277,8 +277,8 @@ install_host_packages() {
         apparmor apt-cacher-ng snapd distro-info-data ubuntu-keyring
         e2fsprogs erofs-utils initramfs-tools device-tree-compiler gdisk dosfstools
         rsync git curl wget ca-certificates gnupg jq xz-utils zstd openssl
-        devscripts dpkg-dev fakeroot file gzip kmod make gcc g++ libc6-dev \
-        libbz2-dev quilt patch nodejs python3 sudo util-linux
+        devscripts dpkg-dev fakeroot file gzip kmod make gcc g++ libc6-dev libbz2-dev quilt
+        libcurl4-openssl-dev patch nodejs python3 sudo util-linux
         docker.io libcap2-bin
     )
     if [[ "$(host_arch)" == amd64 ]]; then
