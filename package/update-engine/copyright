@@ -1,0 +1,17 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Rockchip recovery updateEngine
+Source: external/recovery in the Rockchip Linux SDK
+
+Files: *
+Copyright: 2008-2026 The Android Open Source Project
+           2023-2026 Rockchip Electronics Co., Ltd.
+License: Apache-2.0
+ On Debian and Ubuntu systems, the complete text of the Apache License,
+ Version 2.0 is available in /usr/share/common-licenses/Apache-2.0.
+
+Files: update_engine/md5.c update_engine/md5.h
+Copyright: 2001 Alexander Peslyak
+License: public-domain-or-permissive
+ This implementation was placed in the public domain by its author. If that
+ dedication is not effective, redistribution and use in source and binary
+ forms, with or without modification, are permitted without warranty.

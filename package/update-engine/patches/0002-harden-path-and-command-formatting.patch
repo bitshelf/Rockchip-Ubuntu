@@ -1,0 +1,120 @@
+From: Ubuntu Embedded Team <ljzyx86@qq.com>
+Subject: [PATCH] update_engine: bound paths and recovery commands
+
+The SDK implementation accepts paths supplied by the caller and stores them in
+fixed-size buffers. Reject overlong values rather than truncating or overflowing
+the recovery BCB and partition paths. Use libcurl's current transfer callback
+API while touching the download progress code.
+
+--- a/update_engine/download.c
++++ b/update_engine/download.c
+@@ -24,17 +24,20 @@ extern double processvalue;
+ static int down_processvalue;
+ 
+-int my_progress_func(char *progress_data,
+-                     double t, /* dltotal */
+-                     double d, /* dlnow */
+-                     double ultotal,
+-                     double ulnow)
++int my_progress_func(void *progress_data,
++                     curl_off_t t, /* dltotal */
++                     curl_off_t d, /* dlnow */
++                     curl_off_t ultotal,
++                     curl_off_t ulnow)
+ {
+-    if (ultotal > 0)
+-        processvalue = ulnow / ultotal * 100 / 110;
++    (void)progress_data;
++    (void)ultotal;
++    (void)ulnow;
++    if (t > 0)
++        processvalue = (double)d / (double)t * 100 / 110;
+     else
+         processvalue = 0;
+     //LOGI("ultotal is %f, ulnow is %f, t is %f, d is %f\n", ultotal, ulnow, t, d);
+-    if (t > 0 && down_processvalue != (int)(d / t * 100)) {
+-        down_processvalue = (int)(d / t * 100);
++    if (t > 0 && down_processvalue != (int)((double)d / (double)t * 100)) {
++        down_processvalue = (int)((double)d / (double)t * 100);
+         LOGI("down_processvalue is %d%\n", down_processvalue);
+     }
+@@ -78,2 +81,2 @@ int download_file(char *url, char const *output_filename)
+-        curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, my_progress_func);
+-        curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, progress_data);
++        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, my_progress_func);
++        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, progress_data);
+--- a/update_engine/main.c
++++ b/update_engine/main.c
+@@ -107,18 +107,20 @@ static int MiscUpdate(char *url,  char *update_partition, char *save_path)
+             //写MISC
+             struct bootloader_message msg;
+             memset(&msg, 0, sizeof(msg));
+-            char recovery_str[] = "recovery\n--update_package=";
+-            strcpy(msg.command, "boot-recovery");
+-            sprintf(msg.recovery, "%s%s\n", recovery_str, savepath);
+-            memcpy(msg.needupdate, &partition, 4);
+-            if (true == rkdebug) {
+-                strcat(msg.recovery, "--rkdebug\n");
+-            }
+-            if (NULL != ui_rotation) {
+-                strcat(msg.recovery, "--ui_rotation=");
+-                strcat(msg.recovery, ui_rotation);
+-                msg.recovery[strlen(msg.recovery)] = '\n';
++            int written;
++            snprintf(msg.command, sizeof(msg.command), "boot-recovery");
++            written = snprintf(msg.recovery, sizeof(msg.recovery),
++                               "recovery\n--update_package=%s\n%s%s%s%s",
++                               savepath,
++                               rkdebug ? "--rkdebug\n" : "",
++                               ui_rotation ? "--ui_rotation=" : "",
++                               ui_rotation ? ui_rotation : "",
++                               ui_rotation ? "\n" : "");
++            if (written < 0 || (size_t)written >= sizeof(msg.recovery)) {
++                LOGE("recovery command is too long.\n");
++                return -1;
+             }
++            memcpy(msg.needupdate, &partition, sizeof(partition));
+             set_bootloader_message(&msg);
+             return 0;
+         }
+--- a/update_engine/update.c
++++ b/update_engine/update.c
+@@ -59 +59,6 @@ void RK_ota_set_url(char *url, char *savepath)
+-    sprintf(_url_dir, "%s", _url);
++    if (snprintf(_url_dir, sizeof(_url_dir), "%s", _url) >=
++        (int)sizeof(_url_dir)) {
++        LOGE("update image path is too long.\n");
++        _url = NULL;
++        return;
++    }
+@@ -205,7 +210,16 @@ bool RK_ota_set_partition(int partition)
+             if (is_sdboot || is_usbboot) {
+                 memset(update_cmd[i].dest_path, 0, sizeof(update_cmd[i].dest_path) / sizeof(update_cmd[i].dest_path[0]));
++                int written;
+                 if (strcmp(update_cmd[i].name, "parameter") == 0) {
+-                    sprintf(update_cmd[i].dest_path, "%s/gpt", _url_dir);
++                    written = snprintf(update_cmd[i].dest_path,
++                                       sizeof(update_cmd[i].dest_path),
++                                       "%s/gpt", _url_dir);
+                 } else {
+-                    sprintf(update_cmd[i].dest_path, "%s/%s", _url_dir, update_cmd[i].name);
++                    written = snprintf(update_cmd[i].dest_path,
++                                       sizeof(update_cmd[i].dest_path),
++                                       "%s/%s", _url_dir, update_cmd[i].name);
++                }
++                if (written < 0 || (size_t)written >= sizeof(update_cmd[i].dest_path)) {
++                    LOGE("partition destination path is too long.\n");
++                    return false;
+                 }
+@@ -368 +382,2 @@ void RK_ota_start(RK_upgrade_callback cb, RK_print_callback print_cb)
+-                sprintf(prompt, "[%s] upgrade start...\n", update_cmd[i].name);
++                snprintf(prompt, sizeof(prompt), "[%.31s] upgrade start...\n",
++                         update_cmd[i].name);
+@@ -380 +395,2 @@ void RK_ota_start(RK_upgrade_callback cb, RK_print_callback print_cb)
+-                    sprintf(prompt, "[%s] upgrade fail\n", update_cmd[i].name);
++                    snprintf(prompt, sizeof(prompt), "[%.31s] upgrade fail\n",
++                             update_cmd[i].name);
+@@ -385 +401,2 @@ void RK_ota_start(RK_upgrade_callback cb, RK_print_callback print_cb)
+-                    sprintf(prompt, "[%s] upgraede success!\n", update_cmd[i].name);
++                    snprintf(prompt, sizeof(prompt), "[%.31s] upgrade success!\n",
++                             update_cmd[i].name);

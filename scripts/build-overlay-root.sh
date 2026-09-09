@@ -48,7 +48,7 @@ esac
 declare -A CALLER_ENV=()
 for env_name in ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
     EROFS_ROOTFS_IMAGE USERDATA_IMAGE USERDATA_SIZE_MB BOOTFS_OUTPUT \
-    BOOTFS_CONFIG BOOTFS_TEMPLATE; do
+    BOOTFS_CONFIG BOOTFS_TEMPLATE UPDATE_ENGINE_PACKAGE_DIR UPDATE_ENGINE_DEB; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -75,11 +75,12 @@ PLATFORM_ASSET_DIR="${PLATFORM_ASSET_DIR:-${BUILD_OUTPUT_DIR}/platform-assets/${
 IMAGES_DIR="${BUILD_OUTPUT_DIR}/images"
 USERDATA_SIZE_MB="${USERDATA_SIZE_MB:-64}"
 USERDATA_IMAGE="${USERDATA_IMAGE:-${IMAGES_DIR}/userdata-${SOC_MODEL}.img}"
-BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${IMAGES_DIR}/bootfs-${SOC_MODEL}.img}"
+BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${IMAGES_DIR}/boot-${SOC_MODEL}.img}"
+UPDATE_ENGINE_PACKAGE_DIR="${UPDATE_ENGINE_PACKAGE_DIR:-${BUILD_OUTPUT_DIR}/packages/update-engine}"
 
 [[ "$SOC_MODEL" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || die "invalid SOC_MODEL: $SOC_MODEL"
 for path in "$BUILD_OUTPUT_DIR" "$PLATFORM_ASSET_DIR" "$USERDATA_IMAGE" \
-        "$BOOTFS_OUTPUT"; do
+        "$BOOTFS_OUTPUT" "$UPDATE_ENGINE_PACKAGE_DIR"; do
     [[ "$path" == /* && "$path" != *[[:space:]]* ]] ||
         die "build paths must be absolute and contain no whitespace: $path"
 done
@@ -169,8 +170,8 @@ validate_checksum "$ROOTFS_TARBALL"
 kernel_release="$(<"${PLATFORM_ASSET_DIR}/kernel-release")"
 "${SCRIPT_DIR}/check-kernel-config.sh" \
     "${PLATFORM_ASSET_DIR}/boot/kernel.config"
-for tool in chroot depmod findmnt install jq mkfs.erofs mkfs.ext4 mount tar \
-        truncate umount; do
+for tool in chroot depmod dpkg-deb findmnt install jq mkfs.erofs mkfs.ext4 \
+        mount tar truncate umount; do
     command -v "$tool" >/dev/null || die "missing overlay-root build dependency: $tool"
 done
 [[ "$HOST_ARCH" == arm64 ]] ||
@@ -178,6 +179,8 @@ done
 
 if [[ "$EUID" -ne 0 ]]; then
     exec sudo \
+        --preserve-env=UPDATE_ENGINE_DEB \
+        --preserve-env=UPDATE_ENGINE_PACKAGE_DIR \
         --preserve-env=BOOTFS_CONFIG \
         --preserve-env=BOOTFS_OUTPUT \
         --preserve-env=BOOTFS_TEMPLATE \
@@ -222,6 +225,24 @@ rm -rf -- "$work_dir"
 install -d -m 0755 "$rootfs" "$IMAGES_DIR"
 tar --numeric-owner --xattrs --acls -xzf "$ROOTFS_TARBALL" -C "$rootfs"
 
+if [[ -z "${UPDATE_ENGINE_DEB:-}" ]]; then
+    UPDATE_ENGINE_DEB="$(find_single_file "$UPDATE_ENGINE_PACKAGE_DIR" \
+        'rockchip-update-engine_*_arm64.deb' 'updateEngine ARM64 Debian package')"
+fi
+[[ "$UPDATE_ENGINE_DEB" == /* && -s "$UPDATE_ENGINE_DEB" &&
+   ! -L "$UPDATE_ENGINE_DEB" ]] || die "invalid UPDATE_ENGINE_DEB: $UPDATE_ENGINE_DEB"
+[[ "$(dpkg-deb -f "$UPDATE_ENGINE_DEB" Package)" == rockchip-update-engine &&
+   "$(dpkg-deb -f "$UPDATE_ENGINE_DEB" Architecture)" == arm64 ]] ||
+    die "UPDATE_ENGINE_DEB is not the ARM64 rockchip-update-engine package"
+install -D -m 0644 "$UPDATE_ENGINE_DEB" "$rootfs/tmp/rockchip-update-engine.deb"
+chroot "$rootfs" dpkg -i /tmp/rockchip-update-engine.deb
+rm -f -- "$rootfs/tmp/rockchip-update-engine.deb"
+[[ -x "$rootfs/usr/bin/updateEngine" &&
+   -s "$rootfs/usr/lib/udev/rules.d/99-rockchip-block-by-name.rules" ]] ||
+    die "updateEngine package installation is incomplete"
+update_engine_version="$(dpkg-deb -f "$UPDATE_ENGINE_DEB" Version)"
+update_engine_sha256="$(sha256sum "$UPDATE_ENGINE_DEB" | awk '{print $1}')"
+
 for path in usr/sbin/update-initramfs usr/sbin/mkinitramfs \
         usr/sbin/blkid usr/sbin/e2fsck usr/sbin/resize2fs; do
     [[ -e "$rootfs/$path" ]] || die "Server rootfs is missing /$path"
@@ -229,6 +250,8 @@ done
 install -D -m 0644 "${PROJECT_DIR}/config/overlay-root/overlay-root.conf" \
     "$rootfs/etc/overlay-root.conf"
 install -D -m 0644 "${PROJECT_DIR}/config/overlay-root/fstab" "$rootfs/etc/fstab"
+install -D -m 0644 "${PROJECT_DIR}/config/overlay-root/cloud/90-overlay-root.cfg" \
+    "$rootfs/etc/cloud/cloud.cfg.d/90-overlay-root.cfg"
 install -D -m 0755 \
     "${PROJECT_DIR}/config/overlay-root/initramfs/hooks/overlay-root" \
     "$rootfs/etc/initramfs-tools/hooks/overlay-root"
@@ -239,6 +262,19 @@ install -D -m 0644 \
     "${PROJECT_DIR}/config/overlay-root/initramfs/conf.d/overlay-root" \
     "$rootfs/etc/initramfs-tools/conf.d/overlay-root"
 install -d -m 0755 "$rootfs/boot" "$rootfs/var/lib/overlay-root"
+# The BCB image path must resolve to the same persistent file after recovery
+# mounts the userdata partition at /userdata.
+[[ ! -e "$rootfs/userdata" && ! -L "$rootfs/userdata" ]] ||
+    die "base rootfs already contains /userdata; cannot install recovery data path"
+ln -s var/lib/overlay-root "$rootfs/userdata"
+# Netplan's generator runs before cloud-init writes its first-boot YAML.
+# Enable the selected renderer in the image so wired DHCP also starts on
+# that first boot, when no generated networkd dependency exists yet.
+network_seed="$rootfs/var/lib/cloud/seed/nocloud/network-config"
+if [[ -f "$network_seed" ]] &&
+    grep -Eq '^[[:space:]]*renderer:[[:space:]]*networkd[[:space:]]*$' "$network_seed"; then
+    chroot "$rootfs" systemctl enable systemd-networkd.service
+fi
 "${SCRIPT_DIR}/install-adb.sh" "$rootfs"
 "${SCRIPT_DIR}/install-libmali.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-rga.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
@@ -323,6 +359,9 @@ overlay.lower=rootfs:ro
 overlay.data.partlabel=userdata
 overlay.data.filesystem=ext4
 overlay.data.mount=/var/lib/overlay-root
+overlay.data.recovery-path=/userdata
+update-engine.version=${update_engine_version}
+update-engine.deb.sha256=${update_engine_sha256}
 kernel.release=${kernel_release}
 kernel.config.sha256=$(sha256sum "${PLATFORM_ASSET_DIR}/boot/kernel.config" | awk '{print $1}')
 platform.assets.sha256=$(sha256sum "${PLATFORM_ASSET_DIR}/SHA256SUMS" | awk '{print $1}')

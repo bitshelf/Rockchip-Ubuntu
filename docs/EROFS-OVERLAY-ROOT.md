@@ -6,7 +6,7 @@
 
 - GPT `PARTLABEL=rootfs`：未压缩 EROFS，只读 golden lower；
 - GPT `PARTLABEL=userdata`：ext4，保存 OverlayFS `upper` 和 `work`；
-- GPT `PARTLABEL=bootfs`：ext4，保存 Image、initrd、DTB、DTBO 和 extlinux。
+- GPT `PARTLABEL=boot`：ext4，保存 Image、initrd、DTB、DTBO 和 extlinux。
 
 extlinux 使用 `root=PARTLABEL=rootfs rootfstype=erofs rootwait ro`。initramfs 在
 `switch_root` 前按 `config/overlay-root/overlay-root.conf` 查找 userdata，不依赖
@@ -100,3 +100,11 @@ ext4 backing、已同步 baseline、upper copy-up、已完成记录无 torn writ
 日志中没有 ext4/OverlayFS/I/O error。每次 `prepare` 生成新 token；正式准入至少
 重复 20 次，并保存每轮串口启动日志和 token。24/72/168 小时 soak 属于后续完整
 系统准入，不由本功能伪造。
+
+cloud-init 的 growpart/resizefs 在 EROFS 合成阶段禁用：根目录是 OverlayFS，
+不能对 `/dev/overlay` 扩容。userdata 扩容由 initramfs 的离线 e2fsprogs 流程负责，
+基础 rootfs tarball 的通用 cloud-init 行为不受影响。
+
+写入探针先 fsync 临时记录，再 rename 并同步目录，确保“已完成记录”具有真实的
+持久化语义。每条记录带本轮 token，旧轮记录不能满足本轮验收；校验同时检查
+头尾 token、序号及完整长度。RESET 只能证明硬复位恢复，不能标记为真实断电通过。

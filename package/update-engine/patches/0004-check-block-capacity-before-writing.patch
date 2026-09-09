@@ -1,0 +1,38 @@
+From: Ubuntu Embedded Team <ljzyx86@qq.com>
+Subject: [PATCH] update_engine: reject oversized block payloads before writing
+
+The kernel otherwise rejects the write only at the end of the partition,
+leaving its previous contents destroyed. Query the opened block device
+capacity before the first write. Keep SDK regular-file staging unchanged.
+
+--- a/update_engine/flash_image.c
++++ b/update_engine/flash_image.c
+@@ -18,6 +18,8 @@
+ #include <sys/types.h>
+ #include <unistd.h>
+ #include <sys/stat.h>
++#include <sys/ioctl.h>
++#include <linux/fs.h>
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -186,6 +188,19 @@
+     if (fd_dest < 0) {
+         close(fd_src);
+         LOGE("Can't open %s\n", dest_path);
++        return -2;
++    }
++    /* A short block device must be rejected before its first write. */
++    struct stat dest_stat;
++    unsigned long long capacity;
++    if (fstat(fd_dest, &dest_stat) < 0 ||
++        (S_ISBLK(dest_stat.st_mode) &&
++         (ioctl(fd_dest, BLKGETSIZE64, &capacity) < 0 || size < 0 ||
++          (unsigned long long)size > capacity))) {
++        LOGE("destination capacity check failed: %s, payload %lld bytes\n",
++             dest_path, size);
++        close(fd_src);
++        close(fd_dest);
+         return -2;
+     }
+     if ( lseek64(fd_dest, dest_offset, SEEK_SET) == -1 ) {

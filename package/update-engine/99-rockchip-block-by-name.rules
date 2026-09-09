@@ -1,0 +1,3 @@
+# Rockchip recovery/updateEngine expects Android-style partition symlinks.
+# Keep the standard /dev/disk/by-partlabel links and add compatibility names.
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_PART_ENTRY_NAME}=="?*", SYMLINK+="block/by-name/$env{ID_PART_ENTRY_NAME}"

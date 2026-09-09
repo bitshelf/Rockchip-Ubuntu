@@ -81,7 +81,7 @@ for env_name in "${!POLICY_ENV[@]}"; do
     printf -v "$env_name" '%s' "${POLICY_ENV[$env_name]}"
 done
 
-BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${BUILD_OUTPUT_DIR}/images/bootfs-${SOC_MODEL}.img}"
+BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${BUILD_OUTPUT_DIR}/images/boot-${SOC_MODEL}.img}"
 BOOTFS_INITRD="${BOOTFS_INITRD:-}"
 
 [[ "$SOC_MODEL" =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||

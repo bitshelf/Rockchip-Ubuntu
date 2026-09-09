@@ -26,7 +26,7 @@ grep -Fq 'upperdir=$data/upper,workdir=$data/work' "$initramfs_script" ||
     fail "whole-root OverlayFS layers are missing"
 grep -Fq 'copy_file config /etc/overlay-root.conf /conf/overlay-root.conf' \
     "$initramfs_hook" || fail "initramfs configuration is not copied"
-grep -Eq '^PARTLABEL=bootfs[[:space:]]+/boot[[:space:]]+ext4' "$fstab" ||
+grep -Eq '^PARTLABEL=boot[[:space:]]+/boot[[:space:]]+ext4' "$fstab" ||
     fail "independent bootfs mount is missing"
 ! grep -Eq '^PARTLABEL=userdata[[:space:]]+' "$fstab" ||
     fail "fstab races initramfs for the userdata mount"
