@@ -56,6 +56,8 @@ grep -Fq -- '--resume' "$BUILD_SCRIPT" ||
     fail "ubuntu-image state machine is not resumed after applying APT policy"
 grep -Fq 'openssh-server' "$DEFINITION" ||
     fail "Server SSH package is missing"
+grep -Fq -- '- {name: adbd}' "$DEFINITION" ||
+    fail "ADB daemon is missing from the rootfs definition"
 grep -Fq 'device-tree-compiler' "$DEFINITION" ||
     fail "DTS overlay target validation tools are missing"
 grep -Fq 'initramfs-tools' "$DEFINITION" ||

@@ -1,6 +1,6 @@
 # 构建与交付流程
 
-[返回项目首页](../README.md) · 硬件功能与验收
+[返回项目首页](../README.md) · [硬件功能与验收](HARDWARE-FEATURES.md)
 
 本页集中说明构建主机分工、SDK 输入、文件系统合成和镜像打包入口。
 首次搭建先阅读 [ARM64 主机准备](ARM64-BUILD-HOST.md)，上传与 CI 操作见
@@ -68,6 +68,7 @@ seed 以及带 OverlayFS initramfs 的 bootfs：
 
 内核配置、分区契约、掉电恢复策略和目标板 QA 见
 [EROFS-OVERLAY-ROOT.md](EROFS-OVERLAY-ROOT.md)。
+
 
 ## x86 交叉编译 ARM64
 

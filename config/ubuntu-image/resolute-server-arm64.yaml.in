@@ -39,6 +39,7 @@ customization:
   # product policy must be migrated in its own feature.
   extra-snaps: [{name: snapd}]
   extra-packages:
+    - {name: adbd}
     - {name: bzip2}
     - {name: ca-certificates}
     - {name: curl}
