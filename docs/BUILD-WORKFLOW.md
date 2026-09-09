@@ -59,6 +59,9 @@ ext4 bootfs。生成与验收均不需要挂载镜像：
 
 产物布局、板级策略和离线验收项见 [BOOTFS.md](BOOTFS.md)。
 
+DTS overlay 的源码编译、bootfs 安装、离线合并以及目标重启验收见
+[DTS-OVERLAY.md](DTS-OVERLAY.md)。
+
 ## EROFS lower 与 userdata OverlayFS
 
 Server rootfs 和 platform-assets 都通过验收后，生成不可变 lower、userdata

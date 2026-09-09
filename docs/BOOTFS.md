@@ -1,10 +1,6 @@
 # 独立 bootfs 生成与验证
 
-bootfs 是一个独立的 ext4 产物，只消费已经通过 SHA256 验证的
-platform-assets，不读取 SDK `output/`，也不依赖 rootfs 解包目录。生成和验证
-均不挂载文件系统、不需要 root 权限，适合在 x86、ARM64 手工环境和 Forgejo
-host runner 中执行。构建通过 `fakeroot` 让镜像内文件保持 `root:root`，不会把
-构建主机的用户 UID/GID 写进产物。
+bootfs 是一个独立的 ext4 产物
 
 ## 输入与策略
 
@@ -13,17 +9,26 @@ host runner 中执行。构建通过 `fakeroot` 让镜像内文件保持 `root:r
 - `boot/Image`；
 - `config/bootfs/bootfs.conf` 选择的一个基础 DTB；
 - bundle 中的全部 DTBO，它们只被复制到 `/overlays`，不会自动启用；
+- `DTS_OVERLAY_DIR` 目录中的 `.dtso/.dtbo`，它们会编译或复制到
+  `/overlays` 并自动写入 `FDTOVERLAYS`；
 - 可选的 `BOOTFS_INITRD`，用于后续 initramfs 功能输出。
 
-卷标、容量、基础 DTB、安装名称、启动参数和默认启用 overlay 都属于板级策略，
-放在 `config/bootfs/bootfs.conf`，不硬编码在通用脚本中。基础配置不启用任何
-overlay；SDK 自带 `extlinux.conf` 可能包含固定 PARTUUID，因此不会被复制。
+卷标、容量、基础 DTB、安装名称和启动参数属于板级策略。overlay 启用策略由目录
+内容决定，不维护文件名数组；移植其他 SoC 或客户定制时，只需让
+`DTS_OVERLAY_DIR` 指向对应目录。SDK 自带 `extlinux.conf` 可能包含固定
+PARTUUID，因此不会被复制。
 
 ## 生成
 
 ```bash
 ./scripts/stage-sdk-assets.sh --check
 ./build.sh bootfs
+```
+
+也可以使用 `build/` 下的客户输入目录，无需修改仓库配置：
+
+```bash
+DTS_OVERLAY_DIR="$PWD/build/customer-overlays" ./build.sh bootfs
 ```
 
 x86 默认产物为 `build/images/bootfs-<soc>.img`，ARM64 默认位于
@@ -77,7 +82,9 @@ bash tests/host/test-build-bootfs.sh
 ```
 
 该测试使用临时 platform-assets 生成真实 ext4 镜像，验证 extlinux 内容和
-U-Boot 兼容特性，并确认被修改的镜像不能通过 SHA256 验收。
+U-Boot 兼容特性，编译并安装一份测试 `.dtso`，按 extlinux 顺序完成离线合并，
+并确认被修改的镜像不能通过 SHA256 验收。目标重启验收见
+[DTS-OVERLAY.md](DTS-OVERLAY.md)。
 
 Forgejo 的 Server workflow 先生成 Server rootfs，再执行 `./build.sh overlay-root`；
 后者调用同一个 bootfs 构建器，将 ARM64 原生生成的 initramfs 一并写入 bootfs，

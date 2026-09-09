@@ -36,7 +36,8 @@ esac
 declare -A CALLER_ENV=()
 for env_name in BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR BOOTFS_CONFIG \
     BOOTFS_TEMPLATE BOOTFS_OUTPUT BOOTFS_INITRD BOOTFS_SIZE_MB BOOTFS_LABEL \
-    BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB BOOTFS_TIMEOUT BOOTFS_CMDLINE; do
+    BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB BOOTFS_TIMEOUT BOOTFS_CMDLINE \
+    DTS_OVERLAY_DIR; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -58,10 +59,11 @@ if [[ "$HOST_ARCH" == arm64 ]]; then
 else
     BUILD_OUTPUT_DIR="${BUILD_OUTPUT_DIR:-${PROJECT_DIR}/build}"
 fi
-SOC_MODEL="${SOC_MODEL:-rk3576}"
+SOC_MODEL="${SOC_MODEL:-}"
 PLATFORM_ASSET_DIR="${PLATFORM_ASSET_DIR:-${BUILD_OUTPUT_DIR}/platform-assets/${SOC_MODEL}}"
 BOOTFS_CONFIG="${BOOTFS_CONFIG:-${PROJECT_DIR}/config/bootfs/bootfs.conf}"
 BOOTFS_TEMPLATE="${BOOTFS_TEMPLATE:-${PROJECT_DIR}/config/bootfs/extlinux.conf.in}"
+DTS_OVERLAY_DIR="${DTS_OVERLAY_DIR:-${PROJECT_DIR}/config/dts}"
 
 # Values selected by the caller or .env override repository defaults.
 declare -A POLICY_ENV=()
@@ -72,20 +74,20 @@ for env_name in BOOTFS_SIZE_MB BOOTFS_LABEL BOOTFS_BASE_DTB \
     fi
 done
 [[ -s "$BOOTFS_CONFIG" ]] || die "missing bootfs policy: $BOOTFS_CONFIG"
-# Repository-owned policy defining scalar values and BOOTFS_ENABLED_OVERLAYS.
+# Repository-owned policy defining scalar values.
 # shellcheck disable=SC1090
 source "$BOOTFS_CONFIG"
 for env_name in "${!POLICY_ENV[@]}"; do
     printf -v "$env_name" '%s' "${POLICY_ENV[$env_name]}"
 done
 
-[[ "$(declare -p BOOTFS_ENABLED_OVERLAYS 2>/dev/null || true)" == 'declare -a '* ]] ||
-    die "BOOTFS_ENABLED_OVERLAYS must be an array: $BOOTFS_CONFIG"
 BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${BUILD_OUTPUT_DIR}/images/bootfs-${SOC_MODEL}.img}"
 BOOTFS_INITRD="${BOOTFS_INITRD:-}"
 
 [[ "$SOC_MODEL" =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||
     die "invalid SOC_MODEL: $SOC_MODEL"
+[[ -n "${BOOTFS_BASE_DTB:-}" ]] ||
+    die "BOOTFS_BASE_DTB must be set in .env or the environment"
 for path in "$BUILD_OUTPUT_DIR" "$PLATFORM_ASSET_DIR" "$BOOTFS_OUTPUT"; do
     [[ "$path" == /* && "$path" != *[[:space:]]* ]] ||
         die "build paths must be absolute and contain no whitespace: $path"
@@ -103,7 +105,7 @@ done
     die "invalid BOOTFS_TIMEOUT: $BOOTFS_TIMEOUT"
 [[ -n "$BOOTFS_CMDLINE" && "$BOOTFS_CMDLINE" != *$'\n'* &&
    "$BOOTFS_CMDLINE" != *'|'* ]] || die "invalid BOOTFS_CMDLINE"
-for tool in awk debugfs dumpe2fs e2fsck fdtget sha256sum stat; do
+for tool in awk debugfs dumpe2fs e2fsck fdtget fdtoverlay sha256sum stat; do
     command -v "$tool" >/dev/null || die "missing bootfs validation dependency: $tool"
 done
 
@@ -123,8 +125,10 @@ extract_image_file() {
 validate_bootfs() {
     local image="$1" checksum_file="$2" check_dir label features fs_bytes
     local extlinux manifest path source_hash image_hash extracted overlay
+    local base_tree merged_tree
     local manifest_count=0
     local -a referenced_paths=()
+    local -a overlay_trees=()
 
     [[ -s "$image" && ! -L "$image" ]] || die "missing bootfs image: $image"
     [[ -s "$checksum_file" && ! -L "$checksum_file" ]] ||
@@ -167,10 +171,26 @@ validate_bootfs() {
         extracted="${check_dir}/ref-$(printf '%s' "$path" | sha256sum | awk '{print $1}')"
         extract_image_file "$image" "$path" "$extracted"
         case "$path" in
-            *.dtb|*.dtbo) fdtget -l "$extracted" / >/dev/null ||
-                die "invalid flattened device tree in bootfs: $path" ;;
+            *.dtb)
+                fdtget -l "$extracted" / >/dev/null ||
+                    die "invalid base device tree in bootfs: $path"
+                base_tree="$extracted"
+                ;;
+            *.dtbo)
+                fdtget -l "$extracted" / >/dev/null ||
+                    die "invalid device tree overlay in bootfs: $path"
+                overlay_trees+=("$extracted")
+                ;;
         esac
     done
+    if (( ${#overlay_trees[@]} > 0 )); then
+        [[ -n "${base_tree:-}" ]] || die "extlinux overlays have no base DTB"
+        merged_tree="${check_dir}/merged.dtb"
+        fdtoverlay -i "$base_tree" -o "$merged_tree" "${overlay_trees[@]}" ||
+            die "enabled overlays do not merge with the bootfs base DTB"
+        fdtget -l "$merged_tree" / >/dev/null ||
+            die "offline merged device tree is invalid"
+    fi
     while IFS=$'\t' read -r path source_hash; do
         [[ "$path" =~ ^/[A-Za-z0-9._+/-]+$ && "$path" != *..* &&
            "$source_hash" =~ ^[0-9a-f]{64}$ ]] ||
@@ -202,11 +222,14 @@ if [[ "$MODE" == check ]]; then
 fi
 
 [[ -s "$BOOTFS_TEMPLATE" ]] || die "missing extlinux template: $BOOTFS_TEMPLATE"
+[[ "$DTS_OVERLAY_DIR" == /* && -d "$DTS_OVERLAY_DIR" &&
+   ! -L "$DTS_OVERLAY_DIR" ]] ||
+    die "DTS_OVERLAY_DIR must be an existing absolute directory: $DTS_OVERLAY_DIR"
 if [[ -n "$BOOTFS_INITRD" ]]; then
     [[ "$BOOTFS_INITRD" == /* && -s "$BOOTFS_INITRD" && ! -L "$BOOTFS_INITRD" ]] ||
         die "BOOTFS_INITRD must be an absolute regular file: $BOOTFS_INITRD"
 fi
-for tool in fakeroot find install mkfs.ext4 truncate; do
+for tool in dtc fakeroot find install mkfs.ext4 truncate; do
     command -v "$tool" >/dev/null || die "missing bootfs build dependency: $tool"
 done
 
@@ -235,14 +258,42 @@ mapfile -d '' -t overlay_sources < <(
     find "${PLATFORM_ASSET_DIR}/boot" -maxdepth 1 -type f -name '*.dtbo' \
         -print0 | sort -z
 )
+declare -A installed_overlays=()
 for overlay in "${overlay_sources[@]}"; do
     fdtget -l "$overlay" / >/dev/null || die "invalid staged DT overlay: $overlay"
+    overlay_name="$(basename "$overlay")"
+    [[ ! -v "installed_overlays[$overlay_name]" ]] ||
+        die "duplicate staged DT overlay: $overlay_name"
+    installed_overlays["$overlay_name"]=platform-assets
     install -m 0644 "$overlay" "$work_dir/root/overlays/"
+done
+
+mapfile -d '' -t enabled_overlay_sources < <(
+    find "$DTS_OVERLAY_DIR" -maxdepth 1 -type f \
+        \( -name '*.dtso' -o -name '*.dtbo' \) -print0 | sort -z
+)
+declare -a enabled_overlays=()
+for source_path in "${enabled_overlay_sources[@]}"; do
+    source_name="$(basename "$source_path")"
+    installed_name="${source_name%.dtso}.dtbo"
+    installed_overlays["$installed_name"]="$source_path"
+    compiled_overlay="$work_dir/$installed_name"
+    case "$source_path" in
+        *.dtso) dtc -q -@ -I dts -O dtb -o "$compiled_overlay" "$source_path" ;;
+        *.dtbo) install -m 0644 "$source_path" "$compiled_overlay" ;;
+    esac
+    fdtget -l "$compiled_overlay" / >/dev/null ||
+        die "compiled DTS overlay is invalid: $installed_name"
+    fdtoverlay -i "${PLATFORM_ASSET_DIR}/boot/${BOOTFS_BASE_DTB}" \
+        -o "$work_dir/validated-${installed_name}" "$compiled_overlay" ||
+        die "DTS overlay does not apply to ${BOOTFS_BASE_DTB}: $installed_name"
+    install -m 0644 "$compiled_overlay" "$work_dir/root/overlays/$installed_name"
+    enabled_overlays+=("$installed_name")
 done
 
 overlay_line=""
 declare -A enabled_names=()
-for overlay in "${BOOTFS_ENABLED_OVERLAYS[@]}"; do
+for overlay in "${enabled_overlays[@]}"; do
     [[ "$overlay" =~ ^[A-Za-z0-9._+-]+\.dtbo$ ]] ||
         die "invalid enabled overlay name: $overlay"
     [[ ! -v "enabled_names[$overlay]" ]] || die "duplicate enabled overlay: $overlay"
@@ -298,7 +349,7 @@ platform.assets=${PLATFORM_ASSET_DIR}
 platform.assets.sha256=$(sha256sum "${PLATFORM_ASSET_DIR}/SHA256SUMS" | awk '{print $1}')
 kernel.release=$(<"${PLATFORM_ASSET_DIR}/kernel-release")
 base.dtb=${BOOTFS_BASE_DTB}
-enabled.overlays=${BOOTFS_ENABLED_OVERLAYS[*]:-}
+enabled.overlays=${enabled_overlays[*]:-}
 initrd=$([[ -n "$BOOTFS_INITRD" ]] && echo yes || echo no)
 filesystem=ext4
 filesystem.label=${BOOTFS_LABEL}

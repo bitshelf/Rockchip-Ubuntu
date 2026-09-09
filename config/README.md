@@ -28,6 +28,11 @@ SDK binary input selection is declared separately from product/rootfs policy:
 Independent boot filesystem policy is kept in `bootfs/bootfs.conf`; the
 builder consumes verified platform assets and does not encode board filenames.
 
+Repository DTS overlay sources live directly in `dts/`. The bootfs builder
+compiles `.dtso` files and installs `.dtbo` files. Every supported file in the
+selected directory is enabled; product configuration selects a directory, not
+SoC-specific filenames.
+
 The immutable-root contract is split by responsibility:
 
 - `kernel/overlay-root.conf` is a portable kernel config fragment and
