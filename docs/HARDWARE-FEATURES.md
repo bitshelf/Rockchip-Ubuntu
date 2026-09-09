@@ -34,6 +34,12 @@ patched v4l-utils、libv4l-rkmpp 和独立 V4L2 QA 见
 携带板级 IQ，产品定制通过独立提交加入匹配的 overlay、IQ 包和验收条件。真实 30 帧
 摄像头 QA 见 [ISP.md](ISP.md)。
 
+## GStreamer 与 gst-rkmpp
+
+GStreamer 主体使用 Ubuntu 26 软件源，SDK 仅提供 Rockchip MPP 插件。目标 QA 以
+100 帧 NV12 完成硬件编码、H.264 解析和硬件解码，见
+[GSTREAMER.md](GSTREAMER.md)。
+
 ## ADB 调试
 
 ADB 使用 Ubuntu `adbd` 和通用 USB FunctionFS gadget，保持 root shell 与 host
