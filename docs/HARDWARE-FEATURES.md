@@ -13,6 +13,10 @@ GNOME 与 XFCE 的桌面配置分别见 GNOME.md、XFCE.md。
 WebGPU/Vulkan 后端、硬件证明及限制见 WEBGPU-VULKAN-QA.md。
 中文输入、引擎和词库配置见 RIME-FCITX5-LATEST.md。
 
+## RGA 2D 加速
+
+RGA runtime 随镜像安装，但开发包只用于构建验收工具。目标板 QA 必须完成真实
+dma-buf color fill、同步读回并输出 `RGA_SMOKE_OK`，见 [RGA.md](RGA.md)。
 
 ## ADB 调试
 
