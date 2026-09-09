@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/dts-v1/;
+/plugin/;
+
+/*
+ * Disable the on-board MIPI-DSI display path so DRM exposes HDMI/DP only.
+ * mipidcphy0 is shared with some camera topologies; a camera overlay that
+ * needs it must explicitly re-enable that PHY after this overlay.
+ */
+
+&route_dsi {
+	status = "disabled";
+};
+
+&dsi_in_vp2 {
+	status = "disabled";
+};
+
+&dsi_panel {
+	status = "disabled";
+};
+
+&gt911 {
+	status = "disabled";
+};
+
+&dsi {
+	status = "disabled";
+};
+
+&backlight {
+	status = "disabled";
+};
+
+&pwm0_2ch_0 {
+	status = "disabled";
+};
+
+&mipidcphy0 {
+	status = "disabled";
+};
