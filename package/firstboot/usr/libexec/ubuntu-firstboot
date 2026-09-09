@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-only
+# Account state model derived from Armbian's armbian-firstlogin.
+set -Eeuo pipefail
+export LC_ALL=C.UTF-8
+
+state_dir=/var/lib/ubuntu-firstboot
+pending="${state_dir}/pending"
+customer_file="${state_dir}/customer-user"
+lock=/run/ubuntu-firstboot.lock
+console_device="${UBUNTU_FIRSTBOOT_CONSOLE_DEVICE:-/dev/console}"
+console_active_file="${UBUNTU_FIRSTBOOT_CONSOLE_ACTIVE_FILE:-/sys/class/tty/console/active}"
+console_getty=
+
+valid_username() {
+    [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] &&
+        [[ "$1" != root && "$1" != nobody ]]
+}
+
+console_getty_unit() {
+    local tty=
+    local -a consoles=()
+    [[ -r "$console_active_file" ]] && read -r -a consoles <"$console_active_file"
+    (( ${#consoles[@]} > 0 )) && tty="${consoles[-1]}"
+    [[ -n "$tty" ]] || return 1
+    case "$tty" in
+        tty[0-9]*) printf 'getty@%s.service\n' "$tty" ;;
+        *) printf 'serial-getty@%s.service\n' "$tty" ;;
+    esac
+}
+
+claim_console() {
+    console_getty="$(console_getty_unit 2>/dev/null || true)"
+    [[ -n "$console_getty" ]] || return 0
+    systemctl stop "$console_getty" 2>/dev/null || true
+    systemctl mask --runtime "$console_getty" >/dev/null 2>&1 || true
+}
+
+release_console() {
+    [[ -n "$console_getty" ]] || return 0
+    systemctl unmask --runtime "$console_getty" >/dev/null 2>&1 || true
+    systemctl start "$console_getty" >/dev/null 2>&1 || true
+}
+
+interrupted() {
+    release_console
+    printf '\n初始化尚未完成，下次启动将继续。\n'
+    exit 130
+}
+
+read_username() {
+    local candidate
+    while true; do
+        printf '请输入管理员用户名: ' >&2
+        # Reopen the console after transient EOF. FD 0 remains on this fresh
+        # descriptor so passwd reads from the same console afterwards.
+        if ! exec 0<"$console_device"; then
+            sleep 1
+            continue
+        fi
+        if ! IFS= read -r candidate; then
+            sleep 1
+            continue
+        fi
+        if ! valid_username "$candidate"; then
+            printf '用户名只能使用小写字母、数字、下划线和连字符。\n' >&2
+            continue
+        fi
+        if id "$candidate" >/dev/null 2>&1; then
+            printf '用户 %s 已存在，请使用其他名称。\n' "$candidate" >&2
+            continue
+        fi
+        username="$candidate"
+        return 0
+    done
+}
+
+record_pending_user() {
+    local selected="$1" tmp="${pending}.tmp.$$"
+    printf 'user=%s\n' "$selected" >"$tmp"
+    chmod 0600 "$tmp"
+    mv -f "$tmp" "$pending"
+    sync -f "$state_dir" 2>/dev/null || sync
+}
+
+ensure_user() {
+    local selected="$1" group group_csv home
+    local -a groups=() args=(--create-home --user-group --shell /bin/bash)
+    for group in adm sudo audio video plugdev input render dialout netdev; do
+        getent group "$group" >/dev/null 2>&1 && groups+=("$group")
+    done
+    group_csv="$(IFS=,; printf '%s' "${groups[*]}")"
+    [[ -z "$group_csv" ]] || args+=(--groups "$group_csv")
+    if ! id "$selected" >/dev/null 2>&1; then
+        useradd "${args[@]}" "$selected"
+    fi
+    home="$(getent passwd "$selected" | cut -d: -f6)"
+    [[ "$home" == /home/* ]] || {
+        printf '用户 %s 的 home 路径不安全。\n' "$selected" >&2
+        return 1
+    }
+}
+
+configure_desktop_autologin() {
+    local selected="$1" profile=server enable=no dm path tmp
+    [[ -r /etc/default/ubuntu-firstboot ]] &&
+        # shellcheck disable=SC1091
+        source /etc/default/ubuntu-firstboot
+    profile="${FIRSTBOOT_PROFILE:-$profile}"
+    enable="${FIRSTBOOT_DESKTOP_AUTOLOGIN:-$enable}"
+    [[ "$profile" != server && "$enable" == yes ]] || return 0
+    dm="$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null || true)"
+    case "${dm##*/}" in
+        gdm3.service|gdm.service)
+            path=/etc/gdm3/custom.conf
+            install -d -m 0755 "${path%/*}"
+            tmp="${path}.tmp.$$"
+            printf '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin=%s\n' "$selected" >"$tmp"
+            ;;
+        lightdm.service)
+            path=/etc/lightdm/lightdm.conf.d/50-autologin.conf
+            install -d -m 0755 "${path%/*}"
+            tmp="${path}.tmp.$$"
+            printf '[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\n' "$selected" >"$tmp"
+            ;;
+        *) return 0 ;;
+    esac
+    chmod 0644 "$tmp"
+    mv -f "$tmp" "$path"
+}
+
+main() {
+    local preset preset_user= preset_hash= state username= customer_tmp
+    [[ -e "$pending" ]] || exit 0
+    install -d -m 0700 "$state_dir"
+    exec 9>"$lock"
+    flock -n 9 || exit 0
+    trap interrupted INT TERM
+    trap '' HUP
+    claim_console
+    trap release_console EXIT
+
+    printf '%s\n' 'Ubuntu 首次启动初始化' 'root 账户保持锁定。' ''
+    preset="${state_dir}/preset"
+    if [[ -s "$preset" ]]; then
+        while IFS= read -r line; do
+            case "$line" in
+                user=*) preset_user="${line#user=}" ;;
+                password-hash=*) preset_hash="${line#password-hash=}" ;;
+            esac
+        done <"$preset"
+        if ! valid_username "$preset_user" ||
+           [[ ! "$preset_hash" =~ ^\$[0-9a-z]+\$[./0-9A-Za-z]+\$[./0-9A-Za-z]+$ ]]; then
+            rm -f "$preset"
+            preset_user=
+            preset_hash=
+        fi
+    fi
+
+    if [[ -n "$preset_user" ]]; then
+        username="$preset_user"
+        ensure_user "$username"
+    else
+        state="$(head -n 1 "$pending" 2>/dev/null || true)"
+        if [[ "$state" == user=* ]]; then
+            username="${state#user=}"
+            valid_username "$username" || { echo '首次启动状态损坏。' >&2; exit 1; }
+            ensure_user "$username"
+        else
+            read_username
+            record_pending_user "$username"
+            ensure_user "$username"
+        fi
+    fi
+
+    if [[ -n "$preset_user" ]]; then
+        printf '%s:%s\n' "$username" "$preset_hash" | chpasswd -e
+        record_pending_user "$username"
+        rm -f "$preset"
+    else
+        until passwd "$username"; do
+            printf '密码设置失败，请重试。\n' >&2
+        done
+    fi
+    configure_desktop_autologin "$username"
+
+    customer_tmp="${customer_file}.new"
+    printf '%s\n' "$username" >"$customer_tmp"
+    chown root:root "$customer_tmp"
+    chmod 0644 "$customer_tmp"
+    mv -f "$customer_tmp" "$customer_file"
+    sync -f "$state_dir" 2>/dev/null || sync
+    rm -f /etc/ssh/sshd_config.d/00-firstboot-lockdown.conf
+    rm -f "$pending"
+    sync -f "$state_dir" 2>/dev/null || sync
+    systemctl daemon-reload
+    systemctl start ssh.socket 2>/dev/null || systemctl start ssh.service 2>/dev/null || true
+    release_console
+    trap - EXIT INT TERM HUP
+    printf '\n初始化完成。管理员用户: %s\n' "$username"
+}
+
+[[ "${UBUNTU_FIRSTBOOT_LIBRARY_ONLY:-0}" == 1 ]] || main "$@"

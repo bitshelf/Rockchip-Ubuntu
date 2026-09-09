@@ -46,7 +46,7 @@ esac
 (( $# == 0 )) || { usage >&2; exit 2; }
 
 declare -A CALLER_ENV=()
-for env_name in BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
+for env_name in ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
     EROFS_ROOTFS_IMAGE USERDATA_IMAGE USERDATA_SIZE_MB BOOTFS_OUTPUT \
     BOOTFS_CONFIG BOOTFS_TEMPLATE; do
     if [[ -v "$env_name" ]]; then
@@ -188,6 +188,7 @@ if [[ "$EUID" -ne 0 ]]; then
         --preserve-env=SOC_MODEL \
         --preserve-env=USERDATA_IMAGE \
         --preserve-env=USERDATA_SIZE_MB \
+        --preserve-env=ENABLE_CONSOLE_FIRSTBOOT,FIRSTBOOT_PROFILE \
         "$0" "$@"
 fi
 
@@ -245,6 +246,14 @@ install -d -m 0755 "$rootfs/boot" "$rootfs/var/lib/overlay-root"
 "${SCRIPT_DIR}/install-local-debs.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 
 module_source="${PLATFORM_ASSET_DIR}/modules/lib/modules/${kernel_release}"
+firstboot_args=("$rootfs" --profile "${FIRSTBOOT_PROFILE:-server}")
+case "${ENABLE_CONSOLE_FIRSTBOOT:-yes}" in
+    yes) firstboot_args+=(--enable-console) ;;
+    no) firstboot_args+=(--disable-console) ;;
+    *) die "ENABLE_CONSOLE_FIRSTBOOT must be yes or no" ;;
+esac
+"${SCRIPT_DIR}/install-firstboot.sh" "${firstboot_args[@]}"
+
 module_target="$rootfs/lib/modules/${kernel_release}"
 while IFS= read -r -d '' directory; do
     relative="${directory#"$module_source"}"

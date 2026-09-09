@@ -26,6 +26,8 @@ cp .env.example .env       # 按本机和平台输入修改；不要提交 .env
 ```
 
 完整文件系统合成与可烧录镜像打包见 [构建与交付流程](docs/BUILD-WORKFLOW.md)。
+镜像默认通过首次启动创建管理员账号，不预置账号和密码，详见
+[首次启动配置](docs/UBUNTU-FIRSTBOOT.md)。
 
 ## 文档导航
 

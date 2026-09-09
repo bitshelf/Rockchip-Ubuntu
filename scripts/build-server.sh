@@ -295,9 +295,14 @@ grep -Fq "URIs: ${mirror}" "${WORK_DIR}/ubuntu.sources" ||
     die "rootfs APT sources do not use ${mirror}"
 tar -xOzf "${IMAGES_DIR}/${IMAGE_BASENAME}.rootfs.tar.gz" \
     ./var/lib/cloud/seed/nocloud/user-data >"${WORK_DIR}/user-data"
-grep -Eq '^[[:space:]]+password:[[:space:]]+ubuntu$' \
-    "${WORK_DIR}/user-data" ||
-    die "rootfs is missing the documented temporary cloud-init login"
+grep -Eq '^[[:space:]]*users:[[:space:]]*\[\][[:space:]]*$' \
+    "${WORK_DIR}/user-data" || die "firstboot image must not pre-create a user"
+! grep -Eq '^[[:space:]]*(chpasswd|passwd|password|plain_text_passwd|hashed_passwd):' \
+    "${WORK_DIR}/user-data" || die "firstboot image contains preset credentials"
+tar -xOzf "${IMAGES_DIR}/${IMAGE_BASENAME}.rootfs.tar.gz" ./etc/passwd \
+    >"${WORK_DIR}/passwd"
+awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /(nologin|false)$/ {exit 1}' \
+    "${WORK_DIR}/passwd" || die "firstboot rootfs already contains a login account"
 grep -q '^openssh-server[[:space:]]' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
     die "rootfs manifest does not contain openssh-server"
 grep -q '^adbd[[:space:]]' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
@@ -319,7 +324,7 @@ jq -n \
     '{schema: $schema, result: $result, image: $image, sha256: $sha256,
       source_tree_sha256: $source_tree_sha256,
       checks: ["rootfs.os-release", "rootfs.dpkg-status", "rootfs.apt-mirror",
-               "rootfs.cloud-init-login", "package.openssh-server", "package.adbd",
+               "rootfs.firstboot-no-preset-account", "package.openssh-server", "package.adbd",
                "packages.forbidden-absent"]}' \
     >"${IMAGES_DIR}/${IMAGE_BASENAME}.qa.json"
 chown "${SUDO_UID:-0}:${SUDO_GID:-0}" "${IMAGES_DIR}/${IMAGE_BASENAME}."*
