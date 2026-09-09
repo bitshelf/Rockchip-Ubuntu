@@ -1,0 +1,2 @@
+# MPP is a shared media accelerator used by system and desktop processes.
+KERNEL=="mpp_service", MODE="0666"
