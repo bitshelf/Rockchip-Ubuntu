@@ -54,7 +54,7 @@ ARM64 手工构建和 Forgejo runner 必须在 `.env` 中使用相同的
 - `ubuntu-${UBUNTU_VERSION}-${VARIANT}-${ARCHITECTURE}.qa.json`
 
 构建结束前会解析 tarball，检查 `/usr/lib/os-release` 的 Ubuntu 发行版与系列、
-dpkg 状态数据库、rootfs APT 镜像源、cloud-init 临时登录数据，以及 manifest
+dpkg 状态数据库、rootfs APT 镜像源、cloud-init 无预置账户和凭据，以及 manifest
 中的 `openssh-server`。这些检查只证明 rootfs 构建完整；启动、板级网络、内核
 驱动和硬件功能必须由对应后续功能验收。
 
@@ -64,5 +64,5 @@ Server tarball 同时携带 `initramfs-tools` 和 `e2fsprogs`，供后续
 
 `qa.json` 记录本次 tarball 校验和与最小检查结果。
 
-镜像通过 cloud-init 创建临时 `ubuntu` 账号，初始密码为 `ubuntu`，首次登录
-必须修改。
+镜像不预置账户和密码。板级镜像由 firstboot 引导客户创建管理员账户，
+设置一次密码后正常使用；客户量产定制与回滚见 [UBUNTU-FIRSTBOOT.md](UBUNTU-FIRSTBOOT.md)。

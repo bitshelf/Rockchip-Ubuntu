@@ -25,15 +25,10 @@ customization:
       local-hostname: ubuntu
     user-data: |
       #cloud-config
-      users:
-        - default
+      users: []
+      disable_root: true
       ssh_pwauth: true
-      chpasswd:
-        expire: true
-        users:
-          - name: ubuntu
-            password: ubuntu
-            type: text
+
   # ubuntu-image classic requires a core-bearing snap during its preseed
   # states. Keeping the standard snapd seed is base Server behaviour; later
   # product policy must be migrated in its own feature.

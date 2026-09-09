@@ -1,0 +1,19 @@
+[Unit]
+Description=Create the customer administrator account on first boot
+ConditionPathExists=/var/lib/ubuntu-firstboot/pending
+After=local-fs.target systemd-user-sessions.service
+Before=getty.target display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/ubuntu-firstboot
+# The engine owns /dev/console explicitly. systemd tty-force/TTYVHangup races
+# with serial-getty teardown and can invalidate FD 0 before passwd starts.
+StandardInput=null
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=infinity
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
