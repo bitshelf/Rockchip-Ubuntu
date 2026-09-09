@@ -240,6 +240,28 @@ configure_domestic_apt_mirror() {
     echo "Selected domestic APT mirror: $base"
 }
 
+enable_source_repositories() {
+    local source_file generated=/etc/apt/sources.list.d/ubuntu-ci-source.list
+    local temporary
+
+    while IFS= read -r source_file; do
+        sed -Ei 's/^Types:[[:space:]]*deb[[:space:]]*$/Types: deb deb-src/' \
+            "$source_file"
+    done < <(find /etc/apt -maxdepth 2 -type f -name '*.sources' | sort)
+    temporary="$(mktemp)"
+    while IFS= read -r source_file; do
+        awk '$1 == "deb" { sub(/^deb[[:space:]]+/, "deb-src "); print }' \
+            "$source_file"
+    done < <(find /etc/apt -maxdepth 2 -type f -name '*.list' \
+        ! -path "$generated" | sort) | sort -u >"$temporary"
+    if [[ -s "$temporary" ]]; then
+        install -m 0644 "$temporary" "$generated"
+    else
+        rm -f -- "$generated"
+    fi
+    rm -f -- "$temporary"
+}
+
 install_host_packages() {
     local packages
 
@@ -248,11 +270,13 @@ install_host_packages() {
     apt-get update
     apt-get install -y --no-install-recommends ca-certificates curl
     configure_domestic_apt_mirror
+    enable_source_repositories
     packages=(
         apparmor apt-cacher-ng snapd distro-info-data ubuntu-keyring
         e2fsprogs erofs-utils device-tree-compiler gdisk dosfstools
         rsync git curl wget ca-certificates gnupg jq xz-utils zstd openssl
-        dpkg-dev file gzip kmod make gcc libc6-dev nodejs python3 sudo util-linux
+        devscripts dpkg-dev fakeroot file gzip kmod make gcc g++ libc6-dev \
+        libbz2-dev quilt patch nodejs python3 sudo util-linux
         docker.io libcap2-bin
     )
     if [[ "$(host_arch)" == amd64 ]]; then

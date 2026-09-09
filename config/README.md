@@ -18,3 +18,9 @@ definition until their own feature is migrated.
 
 Cross-build release selection stays in the untracked `.env`; it is not encoded
 in product configuration.
+
+SDK binary input selection is declared separately from product/rootfs policy:
+
+- `kernel-modules/modules.conf` selects the small set of SDK KO files;
+- `local-debs/packages.conf` selects local SDK Debian packages and their
+  expected target architecture.

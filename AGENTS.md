@@ -18,5 +18,8 @@
   and machine-readable evidence. Package presence alone is not hardware proof.
 - Implement one reversible feature at a time. Fold old follow-up fixes into
   the feature being migrated instead of reproducing a chain of fix commits.
+- Build local runtime packages through `scripts/build-local-debs.sh`; extend
+  the local-DEB build, staging and install manifests instead of adding a set
+  of top-level scripts for each package.
 - Stage each completed feature for review. Do not create a commit until the
   user explicitly approves and asks for it.

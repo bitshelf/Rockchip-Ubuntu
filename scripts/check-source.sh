@@ -3,21 +3,26 @@ set -Eeuo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-bash -n "$0"
-bash -n "${PROJECT_DIR}/tests/host/test-repository-contract.sh"
-bash -n "${PROJECT_DIR}/scripts/setup-build-host.sh"
-bash -n "${PROJECT_DIR}/build.sh"
-bash -n "${PROJECT_DIR}/scripts/build-server.sh"
-bash -n "${PROJECT_DIR}/scripts/stage-sdk-assets.sh"
-bash -n "${PROJECT_DIR}/tests/host/test-stage-sdk-assets.sh"
-bash -n "${PROJECT_DIR}/scripts/cross-build-env.sh"
-bash -n "${PROJECT_DIR}/containers/cross-build/configure-apt.sh"
-bash -n "${PROJECT_DIR}/containers/cross-build/entrypoint.sh"
-bash -n "${PROJECT_DIR}/tests/host/test-cross-build-env.sh"
-bash "${PROJECT_DIR}/tests/host/test-repository-contract.sh"
-bash "${PROJECT_DIR}/tests/host/test-build-server.sh"
-bash "${PROJECT_DIR}/tests/host/test-stage-sdk-assets.sh"
-bash "${PROJECT_DIR}/tests/host/test-cross-build-env.sh"
-"${PROJECT_DIR}/scripts/setup-build-host.sh" --self-test
+[[ $# -eq 0 || ( $# -eq 1 && "${1:-}" == --syntax-only ) ]] || {
+    echo 'usage: scripts/check-source.sh [--syntax-only]' >&2; exit 2;
+}
 
+while IFS= read -r -d '' script; do
+    case "$(head -n1 "$script")" in
+        '#!'*bash*) bash -n "$script" ;;
+        '#!'*'/sh'*|'#!'*'env sh'*) sh -n "$script" ;;
+    esac
+done < <(find "$PROJECT_DIR/scripts" "$PROJECT_DIR/tests" "$PROJECT_DIR/config" \
+    "$PROJECT_DIR/package" -type f -print0 | sort -z)
+
+if [[ "${1:-}" == --syntax-only ]]; then
+    echo 'Shell syntax checks passed'; exit 0;
+fi
+
+while IFS= read -r -d '' test_script; do
+    bash "$test_script"
+done < <(find "$PROJECT_DIR/tests/host" -maxdepth 1 -type f \
+    -name 'test-*.sh' -print0 | sort -z)
+
+"$PROJECT_DIR/scripts/setup-build-host.sh" --self-test
 echo "Source checks passed"
