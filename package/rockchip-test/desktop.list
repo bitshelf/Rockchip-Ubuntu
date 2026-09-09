@@ -1,0 +1,5 @@
+# Desktop includes the Server hardware gates plus interactive display tests.
+include server
+gpu-display
+video-display
+chromium

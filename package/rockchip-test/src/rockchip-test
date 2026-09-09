@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+    cat <<'EOF'
+usage:
+  rockchip-test list <server|desktop>
+  rockchip-test qa <server|desktop> [output.json]
+  rockchip-test menu
+
+qa runs non-destructive image readiness checks. The vendor menu contains
+destructive and long-running entries and is never started by qa.
+EOF
+}
+
+case "${1:-}" in
+    list)
+        [[ "${2:-}" == server || "${2:-}" == desktop ]] || {
+            usage >&2; exit 2;
+        }
+        cat "/usr/share/rockchip-test/profiles/${2}.list"
+        ;;
+    qa)
+        [[ "${2:-}" == server || "${2:-}" == desktop ]] || {
+            usage >&2; exit 2;
+        }
+        profile="$2"
+        shift 2
+        exec /usr/libexec/rockchip-test-qa --profile "$profile" "$@"
+        ;;
+    menu)
+        (( $# == 1 )) || { usage >&2; exit 2; }
+        exec /usr/lib/rockchip-test/rockchip_test.sh
+        ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+esac

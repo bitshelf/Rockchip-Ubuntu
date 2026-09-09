@@ -16,6 +16,8 @@ usage: ./build.sh server [--check]
   update-engine-source  stage updateEngine source from the SDK Git checkout
   update-engine         build the ARM64 rockchip-update-engine Debian package
   update-engine --check validate staged updateEngine source and build paths
+  rockchip-test         build the Rockchip test payload as a Debian package
+  rockchip-test --check validate the external test payload and package paths
   edit-package-file     edit the Rockchip SDK factory package-file
   edit-ota-package-file edit the Rockchip SDK OTA package-file
   updateimg             run the Rockchip SDK factory image packer
@@ -59,6 +61,10 @@ case "${1:-}" in
     update-engine)
         shift
         exec "${PROJECT_DIR}/scripts/build-update-engine.sh" "$@"
+        ;;
+    rockchip-test)
+        shift
+        exec "${PROJECT_DIR}/scripts/build-rockchip-test-package.sh" "$@"
         ;;
     edit-package-file|edit-ota-package-file|updateimg|ota-updateimg)
         command="$1"
