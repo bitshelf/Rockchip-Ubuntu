@@ -1,0 +1,3 @@
+# DRM GEM RKNPU and the legacy misc-device interface.
+SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="rknpu", GROUP="render", MODE="0660", TAG+="uaccess"
+KERNEL=="rknpu", GROUP="render", MODE="0660", TAG+="uaccess"

@@ -34,6 +34,12 @@ patched v4l-utils、libv4l-rkmpp 和独立 V4L2 QA 见
 携带板级 IQ，产品定制通过独立提交加入匹配的 overlay、IQ 包和验收条件。真实 30 帧
 摄像头 QA 见 [ISP.md](ISP.md)。
 
+## RKNPU2
+
+RKNPU2 运行库、server 和 MobileNet 验收模型由 SDK 外部输入构建成 DEB；目标 QA
+要求普通用户完成 Top-1、延迟和 200/200 soak 推理，见
+[RKNPU.md](RKNPU.md)。
+
 ## GStreamer 与 gst-rkmpp
 
 GStreamer 主体使用 Ubuntu 26 软件源，SDK 仅提供 Rockchip MPP 插件。目标 QA 以

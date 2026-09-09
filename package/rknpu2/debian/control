@@ -1,0 +1,39 @@
+Source: librknnrt2
+Section: libs
+Priority: optional
+Maintainer: Ubuntu image CI <root@localhost>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/airockchip/rknn-toolkit2
+
+Package: librknnrt2
+Architecture: arm64
+Multi-Arch: same
+Provides: librknnrt (= ${binary:Version})
+Depends: ${misc:Depends}, libc6 (>= 2.17), libstdc++6
+Description: Rockchip RKNN runtime library for RKNPU2
+ Repackages the closed-source Rockchip RKNN runtime library for applications
+ that execute neural-network models on a Rockchip NPU.
+
+Package: librknnrt-dev
+Architecture: arm64
+Multi-Arch: same
+Section: libdevel
+Depends: ${misc:Depends}, librknnrt2 (= ${binary:Version})
+Description: Development files for the Rockchip RKNN runtime
+ Provides the RKNN API headers plus pkg-config and CMake metadata.
+
+Package: rknn-server
+Architecture: arm64
+Section: utils
+Depends: ${misc:Depends}, librknnrt2 (= ${binary:Version}), libc6 (>= 2.17), libstdc++6
+Recommends: rknn-models (= ${binary:Version})
+Description: Rockchip RKNN server and common test utility
+ Provides rknn_server and the vendor rknn_common_test inference utility.
+
+Package: rknn-models
+Architecture: all
+Section: misc
+Depends: ${misc:Depends}
+Description: Rockchip RKNPU2 MobileNet acceptance models
+ Provides the SDK MobileNet models and sample inputs used by target QA.
