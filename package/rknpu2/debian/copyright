@@ -1,0 +1,9 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: rknpu2
+Source: https://github.com/airockchip/rknn-toolkit2
+
+Files: *
+Copyright: 2019-2025 Rockchip Electronics Co., Ltd.
+License: Proprietary
+ The prebuilt runtime, server, test binary and models remain the property of
+ Rockchip Electronics Co., Ltd. and are repackaged from the Rockchip SDK.

@@ -1,0 +1,5 @@
+usr/include/rknn_api.h
+usr/include/rknn_custom_op.h
+usr/include/rknn_matmul_api.h
+usr/lib/aarch64-linux-gnu/pkgconfig/rknn_api.pc
+usr/lib/aarch64-linux-gnu/cmake/RKNN.cmake

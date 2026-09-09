@@ -1,0 +1,6 @@
+librknnrt2 (2.3.2-1+rockchip.@SERIES@.1) @SERIES@; urgency=medium
+
+  * Repackage the Rockchip RKNPU2 runtime, server, common test and models.
+  * Replace the vendor restart loop with a systemd service.
+
+ -- Ubuntu image CI <root@localhost>  Thu, 03 Sep 2026 00:00:00 +0000

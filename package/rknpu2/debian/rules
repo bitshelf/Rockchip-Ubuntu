@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+override_dh_auto_build:
+override_dh_auto_install:
+	./debian/install-blobs.sh debian/tmp
+
+# The vendor library has an unversioned SONAME and the binaries are prebuilt.
+override_dh_makeshlibs:
+override_dh_shlibdeps:
+override_dh_strip:
+override_dh_dwz:
+
+override_dh_installsystemd:
+	dh_installsystemd
