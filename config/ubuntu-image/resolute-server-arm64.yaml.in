@@ -43,6 +43,8 @@ customization:
     - {name: ca-certificates}
     - {name: curl}
     - {name: device-tree-compiler}
+    - {name: e2fsprogs}
+    - {name: initramfs-tools}
     - {name: openssh-server}
     - {name: sudo}
     - {name: udev}

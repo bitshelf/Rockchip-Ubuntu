@@ -11,6 +11,8 @@ usage: ./build.sh server [--check]
   server --check  validate configuration and host prerequisites only
   bootfs          build an independent ext4 boot filesystem
   bootfs --check  validate an existing bootfs image without mounting it
+  overlay-root          build EROFS lower, userdata and OverlayFS initramfs
+  overlay-root --check  validate the three existing filesystem artifacts
 EOF
 }
 
@@ -22,6 +24,10 @@ case "${1:-}" in
     bootfs)
         shift
         exec "${PROJECT_DIR}/scripts/build-bootfs.sh" "$@"
+        ;;
+    overlay-root)
+        shift
+        exec "${PROJECT_DIR}/scripts/build-overlay-root.sh" "$@"
         ;;
     -h|--help|help)
         usage

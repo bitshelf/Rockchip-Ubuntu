@@ -27,6 +27,7 @@ output="${tmp_dir}/output"
 soc=test-soc
 release=6.99.1-test
 install -d "$sdk/output/extlinux" \
+    "$sdk/kernel" \
     "$sdk/output/linux-headers" \
     "$sdk/output/kernel-modules/lib/modules/${release}/kernel/drivers/test" \
     "$sdk/output/kernel-modules/lib/modules/${release}/kernel/drivers/unused"
@@ -37,6 +38,11 @@ printf 'extlinux\n' >"$sdk/output/extlinux/extlinux.conf"
 printf 'module\n' >"$sdk/output/kernel-modules/lib/modules/${release}/kernel/drivers/test/test.ko"
 printf 'unused module\n' \
     >"$sdk/output/kernel-modules/lib/modules/${release}/kernel/drivers/unused/unused.ko"
+cp "${PROJECT_DIR}/config/kernel/overlay-root.conf" "$sdk/kernel/.config"
+printf 'kernel/fs/erofs/erofs.ko\n' \
+    >"$sdk/output/kernel-modules/lib/modules/${release}/modules.builtin"
+printf 'kernel/fs/erofs/erofs.ko: alias=fs-erofs\n' \
+    >"$sdk/output/kernel-modules/lib/modules/${release}/modules.builtin.modinfo"
 make_test_deb arm64 "$sdk/output/linux-headers/linux-headers-test_arm64.deb"
 make_test_deb amd64 "$sdk/output/linux-headers/linux-headers-test_amd64.deb"
 module_config="${tmp_dir}/modules.conf"
@@ -66,13 +72,18 @@ SDK_DIR="$sdk" BUILD_OUTPUT_DIR="$output" SOC_MODEL="$soc" \
     KERNEL_MODULE_CONFIG="$module_config" LOCAL_DEB_CONFIG="$deb_config" \
     "$STAGE_SCRIPT"
 asset_dir="${output}/platform-assets/${soc}"
-grep -Fxq 'schema=ubuntu-platform-assets-v3' \
+grep -Fxq 'schema=ubuntu-platform-assets-v4' \
     "$asset_dir/.platform-asset-root" || fail "platform asset schema was not upgraded"
 [[ "$(stat -c %a "$asset_dir")" == 2750 ]] ||
     fail "platform asset root is not readable by the build group"
 [[ -s "$asset_dir/boot/Image" ]] || fail "kernel Image was not staged"
 [[ -s "$asset_dir/boot/board-under-test.dtb" ]] || fail "DTB was not staged"
 [[ -s "$asset_dir/boot/example.dtbo" ]] || fail "DT overlay was not staged"
+[[ -s "$asset_dir/boot/kernel.config" ]] || fail "kernel config was not staged"
+"${PROJECT_DIR}/scripts/check-kernel-config.sh" \
+    "$asset_dir/boot/kernel.config" >/dev/null
+[[ -s "$asset_dir/modules/lib/modules/${release}/modules.builtin" ]] ||
+    fail "modules.builtin was not staged"
 [[ -s "$asset_dir/modules/lib/modules/${release}/kernel/drivers/test/test.ko" ]] ||
     fail "selected kernel module was not staged"
 [[ ! -e "$asset_dir/modules/lib/modules/${release}/kernel/drivers/unused/unused.ko" ]] ||

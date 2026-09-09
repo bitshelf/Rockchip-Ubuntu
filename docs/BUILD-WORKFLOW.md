@@ -56,6 +56,19 @@ ext4 bootfs。生成与验收均不需要挂载镜像：
 
 产物布局、板级策略和离线验收项见 [BOOTFS.md](BOOTFS.md)。
 
+## EROFS lower 与 userdata OverlayFS
+
+Server rootfs 和 platform-assets 都通过验收后，生成不可变 lower、userdata
+seed 以及带 OverlayFS initramfs 的 bootfs：
+
+```bash
+./build.sh overlay-root
+./build.sh overlay-root --check
+```
+
+内核配置、分区契约、掉电恢复策略和目标板 QA 见
+[EROFS-OVERLAY-ROOT.md](EROFS-OVERLAY-ROOT.md)。
+
 ## x86 交叉编译 ARM64
 
 在 x86_64 主机使用 GNU AArch64 交叉工具链。宿主机可以是 Debian 或 Ubuntu，

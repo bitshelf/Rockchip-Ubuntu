@@ -79,6 +79,6 @@ bash tests/host/test-build-bootfs.sh
 该测试使用临时 platform-assets 生成真实 ext4 镜像，验证 extlinux 内容和
 U-Boot 兼容特性，并确认被修改的镜像不能通过 SHA256 验收。
 
-Forgejo 的 Server workflow 在 platform-assets 验收后也会执行
-`./build.sh bootfs`；因此 ARM64 CI 会留下同样的 bootfs、SHA256 和 build-info，
-然后再构建 Server rootfs。bootfs 与 rootfs 构建失败可以独立定位。
+Forgejo 的 Server workflow 先生成 Server rootfs，再执行 `./build.sh overlay-root`；
+后者调用同一个 bootfs 构建器，将 ARM64 原生生成的 initramfs 一并写入 bootfs，
+并保留相同的 SHA256 和 build-info 离线验收契约。

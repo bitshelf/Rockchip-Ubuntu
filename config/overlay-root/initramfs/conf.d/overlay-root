@@ -1,0 +1,4 @@
+# All filesystems required before switch_root are built into the kernel.
+# Only explicitly requested hardware modules may enter this initramfs.
+MODULES=list
+COMPRESS=gzip

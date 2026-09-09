@@ -27,3 +27,10 @@ SDK binary input selection is declared separately from product/rootfs policy:
 
 Independent boot filesystem policy is kept in `bootfs/bootfs.conf`; the
 builder consumes verified platform assets and does not encode board filenames.
+
+The immutable-root contract is split by responsibility:
+
+- `kernel/overlay-root.conf` is a portable kernel config fragment and
+  acceptance contract;
+- `overlay-root/` owns the initramfs policy, fstab and persistent userdata
+  identity. It never formats an unrecognized device during boot.

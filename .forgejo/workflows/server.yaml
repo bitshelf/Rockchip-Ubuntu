@@ -22,8 +22,8 @@ jobs:
       - name: Check SDK platform assets
         run: ./scripts/stage-sdk-assets.sh --check
 
-      - name: Build independent bootfs
-        run: ./build.sh bootfs
-
       - name: Build server rootfs
         run: ./build.sh server
+
+      - name: Build EROFS lower and OverlayFS boot artifacts
+        run: ./build.sh overlay-root

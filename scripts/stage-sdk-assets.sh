@@ -36,8 +36,9 @@ esac
 (( $# == 0 )) || { usage >&2; exit 2; }
 
 declare -A CALLER_ENV=()
-for env_name in BUILD_OUTPUT_DIR SDK_DIR SDK_OUTPUT_DIR SOC_MODEL \
-    PLATFORM_ASSET_DIR KERNEL_MODULE_CONFIG LOCAL_DEB_CONFIG; do
+for env_name in BUILD_OUTPUT_DIR SDK_DIR SDK_OUTPUT_DIR SDK_KERNEL_CONFIG \
+    SOC_MODEL PLATFORM_ASSET_DIR KERNEL_MODULE_CONFIG \
+    KERNEL_CONFIG_REQUIREMENTS LOCAL_DEB_CONFIG; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -61,17 +62,27 @@ else
 fi
 SDK_DIR="${SDK_DIR:-$(cd "${PROJECT_DIR}/.." && pwd)}"
 SDK_OUTPUT_DIR="${SDK_OUTPUT_DIR:-${SDK_DIR}/output}"
+SDK_KERNEL_CONFIG="${SDK_KERNEL_CONFIG:-}"
 SOC_MODEL="${SOC_MODEL:-}"
 PLATFORM_ASSET_DIR="${PLATFORM_ASSET_DIR:-${BUILD_OUTPUT_DIR}/platform-assets/${SOC_MODEL}}"
 KERNEL_MODULE_CONFIG="${KERNEL_MODULE_CONFIG:-${PROJECT_DIR}/config/kernel-modules/modules.conf}"
+KERNEL_CONFIG_REQUIREMENTS="${KERNEL_CONFIG_REQUIREMENTS:-${PROJECT_DIR}/config/kernel/overlay-root.conf}"
 LOCAL_DEB_CONFIG="${LOCAL_DEB_CONFIG:-${PROJECT_DIR}/config/local-debs/packages.conf}"
 
 [[ "$SOC_MODEL" =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||
     die "invalid SOC_MODEL: $SOC_MODEL"
-for path in "$BUILD_OUTPUT_DIR" "$SDK_OUTPUT_DIR" "$PLATFORM_ASSET_DIR"; do
+for path in "$BUILD_OUTPUT_DIR" "$PLATFORM_ASSET_DIR"; do
     [[ "$path" == /* && "$path" != *[[:space:]]* ]] ||
         die "build paths must be absolute and contain no whitespace: $path"
 done
+if [[ "$MODE" == stage ]]; then
+    [[ -n "$SDK_KERNEL_CONFIG" ]] ||
+        die "SDK_KERNEL_CONFIG must point to the SDK kernel build .config"
+    for path in "$SDK_OUTPUT_DIR" "$SDK_KERNEL_CONFIG"; do
+        [[ "$path" == /* && "$path" != *[[:space:]]* ]] ||
+            die "SDK input paths must be absolute and contain no whitespace: $path"
+    done
+fi
 [[ "$(basename "$PLATFORM_ASSET_DIR")" == "$SOC_MODEL" ]] ||
     die "PLATFORM_ASSET_DIR must end with SOC_MODEL (${SOC_MODEL})"
 for tool in awk dpkg-deb find install sha256sum; do
@@ -97,7 +108,8 @@ validate_existing_bundle() {
         die "missing platform asset schema marker: $root"
     schema="$(<"${root}/.platform-asset-root")"
     case "$schema" in
-        schema=ubuntu-platform-assets-v3) validate_bundle "$root" ;;
+        schema=ubuntu-platform-assets-v4) validate_bundle "$root" ;;
+        schema=ubuntu-platform-assets-v3) validate_checksums "$root" ;;
         schema=ubuntu-platform-assets-v2) validate_checksums "$root" ;;
         # v1 predates the repository-owned checksum contract. The marker is
         # sufficient only for one-time replacement with the current bundle.
@@ -111,11 +123,12 @@ validate_bundle() {
     [[ -d "$root" && ! -L "$root" ]] ||
         die "platform asset directory is unavailable: $root"
     for entry in .platform-asset-root SHA256SUMS asset-info boot/Image \
-        kernel-release module-manifest.tsv local-deb-manifest.tsv; do
+        boot/kernel.config kernel-release module-manifest.tsv \
+        local-deb-manifest.tsv; do
         [[ -s "${root}/${entry}" && ! -L "${root}/${entry}" ]] ||
             die "missing platform asset: ${root}/${entry}"
     done
-    grep -Fxq 'schema=ubuntu-platform-assets-v3' \
+    grep -Fxq 'schema=ubuntu-platform-assets-v4' \
         "${root}/.platform-asset-root" ||
         die "unsupported platform asset schema: $root"
     release="$(<"${root}/kernel-release")"
@@ -124,6 +137,12 @@ validate_bundle() {
     modules_root="${root}/modules/lib/modules/${release}"
     [[ -d "$modules_root" && ! -L "$modules_root" ]] ||
         die "module tree does not match kernel release: $release"
+    for entry in modules.builtin modules.builtin.modinfo; do
+        [[ -s "${modules_root}/${entry}" && ! -L "${modules_root}/${entry}" ]] ||
+            die "missing kernel module metadata: ${modules_root}/${entry}"
+    done
+    "${PROJECT_DIR}/scripts/check-kernel-config.sh" \
+        "${root}/boot/kernel.config" "$KERNEL_CONFIG_REQUIREMENTS" >/dev/null
     local module_source module_target autoload module_count=0
     while IFS=$'\t' read -r module_source module_target autoload; do
         [[ "$module_source" != /* && "$module_source" != *..* &&
@@ -215,6 +234,15 @@ stage_bundle() {
     (( ${#DEB_ENTRIES[@]} > 0 )) ||
         die "DEB_ENTRIES is empty: $LOCAL_DEB_CONFIG"
     source_module_root="${releases[0]}/kernel"
+    [[ -s "$SDK_KERNEL_CONFIG" && ! -L "$SDK_KERNEL_CONFIG" ]] ||
+        die "missing SDK kernel config: $SDK_KERNEL_CONFIG"
+    "${PROJECT_DIR}/scripts/check-kernel-config.sh" \
+        "$SDK_KERNEL_CONFIG" "$KERNEL_CONFIG_REQUIREMENTS"
+    for entry in modules.builtin modules.builtin.modinfo; do
+        [[ -s "${releases[0]}/${entry}" && ! -L "${releases[0]}/${entry}" ]] ||
+            die "missing SDK module metadata: ${releases[0]}/${entry}"
+    done
+
     parent="$(dirname "$PLATFORM_ASSET_DIR")"
     install -d -m 2775 "$parent"
     stage="$(mktemp -d "${parent}/.${SOC_MODEL}.stage.XXXXXX")"
@@ -227,11 +255,15 @@ stage_bundle() {
         "$stage/debs"
     install -m 0644 "${source_boot}/Image" "$stage/boot/Image"
     install -m 0644 "${dt_inputs[@]}" "$stage/boot/"
+    install -m 0644 "$SDK_KERNEL_CONFIG" "$stage/boot/kernel.config"
     if [[ -s "${source_boot}/extlinux.conf" ]]; then
         install -m 0644 "${source_boot}/extlinux.conf" \
             "$stage/boot/extlinux.conf"
     fi
     install -d -m 0755 "$stage/modules/lib/modules/$release"
+    install -m 0644 "${releases[0]}/modules.builtin" \
+        "${releases[0]}/modules.builtin.modinfo" \
+        "$stage/modules/lib/modules/$release/"
     : >"$stage/module-manifest.tsv"
     declare -A module_targets=()
     for entry in "${MODULE_ENTRIES[@]}"; do
@@ -296,18 +328,19 @@ stage_bundle() {
             >>"$stage/local-deb-manifest.tsv"
     done
     printf '%s\n' "$release" >"$stage/kernel-release"
-    printf 'schema=ubuntu-platform-assets-v3\n' >"$stage/.platform-asset-root"
+    printf 'schema=ubuntu-platform-assets-v4\n' >"$stage/.platform-asset-root"
 
     source_commit=unknown
     if git -C "$SDK_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         source_commit="$(git -C "$SDK_DIR" rev-parse --verify HEAD)"
     fi
     cat >"$stage/asset-info" <<EOF
-schema=ubuntu-platform-assets-v3
+schema=ubuntu-platform-assets-v4
 soc=${SOC_MODEL}
 kernel.release=${release}
 sdk.commit=${source_commit}
 sdk.boot.source=output/extlinux
+sdk.kernel.config=${SDK_KERNEL_CONFIG#"${SDK_DIR%/}/"}
 sdk.modules.source=output/kernel-modules/lib/modules/${release}
 sdk.debs.source=output
 staged.at=$(date --iso-8601=seconds)
