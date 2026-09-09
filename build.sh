@@ -9,6 +9,8 @@ usage: ./build.sh server [--check]
 
   server          build the Ubuntu 26 Server ARM64 rootfs
   server --check  validate configuration and host prerequisites only
+  bootfs          build an independent ext4 boot filesystem
+  bootfs --check  validate an existing bootfs image without mounting it
 EOF
 }
 
@@ -16,6 +18,10 @@ case "${1:-}" in
     server)
         shift
         exec "${PROJECT_DIR}/scripts/build-server.sh" "$@"
+        ;;
+    bootfs)
+        shift
+        exec "${PROJECT_DIR}/scripts/build-bootfs.sh" "$@"
         ;;
     -h|--help|help)
         usage
