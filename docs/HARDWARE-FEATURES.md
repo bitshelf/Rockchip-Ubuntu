@@ -46,6 +46,11 @@ GStreamer 主体使用 Ubuntu 26 软件源，SDK 仅提供 Rockchip MPP 插件�
 100 帧 NV12 完成硬件编码、H.264 解析和硬件解码，见
 [GSTREAMER.md](GSTREAMER.md)。
 
+## ALSA 命令行工具
+
+Server 默认安装 `alsa-utils`；非破坏性的声卡、PCM 和 mixer CLI 验收见
+[ALSA-UTILS.md](ALSA-UTILS.md)。
+
 ## Rockchip 镜像测试
 
 SDK `external/rockchip-test/` 可封装为默认不集成的 `rockchip-test`
