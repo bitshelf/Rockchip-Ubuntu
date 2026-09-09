@@ -1,0 +1,37 @@
+name: Publish platform assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ${{ vars.SDK_RUNNER_LABEL || 'self-hosted' }}
+    timeout-minutes: 120
+    env:
+      BUILD_OUTPUT_DIR: ${{ vars.BUILD_OUTPUT_DIR }}
+      SDK_DIR: ${{ vars.SDK_DIR }}
+      SDK_OUTPUT_DIR: ${{ vars.SDK_OUTPUT_DIR }}
+      SDK_KERNEL_CONFIG: ${{ vars.SDK_KERNEL_CONFIG }}
+      SOC_MODEL: ${{ vars.SOC_MODEL }}
+      ASSET_PROVIDER: github
+      ASSET_REPOSITORY: ${{ github.repository }}
+      ASSET_TAG: ${{ vars.PLATFORM_ASSET_RELEASE_TAG }}
+      ASSET_TARGET_COMMIT: ${{ github.sha }}
+      ASSET_TOKEN: ${{ github.token }}
+      PLATFORM_ASSET_BUNDLE: ${{ github.workspace }}/artifacts/platform-assets-${{ vars.SOC_MODEL }}.tar.zst
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage verified SDK outputs
+        run: ./scripts/stage-sdk-assets.sh
+
+      - name: Build immutable asset bundle
+        run: ./scripts/pack-platform-assets.sh "$PLATFORM_ASSET_BUNDLE"
+
+      - name: Publish GitHub release assets
+        run: ./scripts/publish-platform-assets.sh

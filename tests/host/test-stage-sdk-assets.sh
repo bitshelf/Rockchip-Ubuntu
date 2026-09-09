@@ -103,6 +103,20 @@ SDK_DIR="$sdk" BUILD_OUTPUT_DIR="$output" SOC_MODEL="$soc" \
     KERNEL_MODULE_CONFIG="$module_config" LOCAL_DEB_CONFIG="$deb_config" \
     "$STAGE_SCRIPT" --check
 
+bundle="${tmp_dir}/artifacts/platform-assets-${soc}.tar.zst"
+BUILD_OUTPUT_DIR="$output" SOC_MODEL="$soc" PLATFORM_ASSET_DIR="$asset_dir" \
+    "${PROJECT_DIR}/scripts/pack-platform-assets.sh" "$bundle" >/dev/null
+[[ -s "$bundle" && -s "${bundle}.sha256" ]] ||
+    fail "platform asset bundle was not created"
+mv "$asset_dir" "${asset_dir}.before-fetch"
+BUILD_OUTPUT_DIR="$output" SOC_MODEL="$soc" PLATFORM_ASSET_DIR="$asset_dir" \
+    "${PROJECT_DIR}/scripts/fetch-platform-assets.sh" "$bundle" >/dev/null
+[[ -s "$asset_dir/boot/Image" && -s "$asset_dir/SHA256SUMS" ]] ||
+    fail "downloaded platform assets were not installed"
+cmp "$asset_dir/local-deb-manifest.tsv" \
+    "${asset_dir}.before-fetch/local-deb-manifest.tsv" >/dev/null ||
+    fail "platform asset bundle changed its manifest"
+
 printf 'tampered\n' >>"$headers_deb"
 if SDK_DIR="$sdk" BUILD_OUTPUT_DIR="$output" SOC_MODEL="$soc" \
     SDK_KERNEL_CONFIG="$sdk/kernel/.config" \

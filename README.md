@@ -32,5 +32,6 @@ cp .env.example .env       # 按本机和平台输入修改；不要提交 .env
 | 内容 | 文档 |
 | --- | --- |
 | 主机准备、构建流程与 SDK 打包 | [构建主机](docs/ARM64-BUILD-HOST.md) · [构建与交付](docs/BUILD-WORKFLOW.md) |
+| CI 构建与镜像发布 | [CI 与 Release](docs/CI-ASSETS.md) |
 | GPU、视频、摄像头、NPU、音频等功能 | [硬件功能与验收](docs/HARDWARE-FEATURES.md) |
 | 商业使用、许可与社区协作 | [商业使用说明](docs/COMMERCIAL-USE.md) · [贡献指南](CONTRIBUTING.md) |
