@@ -40,6 +40,10 @@ The immutable-root contract is split by responsibility:
 - `overlay-root/` owns the initramfs policy, fstab and persistent userdata
   identity. It never formats an unrecognized device during boot.
 
+
+`update-engine/` owns only the ARM64 Debian package metadata, reviewed source
+patches and Ubuntu udev compatibility links. OTA partition selection and
+packing stay with the Rockchip SDK commands.
 `adb/` owns the common USB FunctionFS gadget and service policy. adbd stays in
 the host network namespace and runs as root so ADB and serial diagnostics see
 the same board state.

@@ -1,0 +1,21 @@
+From: Ubuntu Embedded Team <ljzyx86@qq.com>
+Subject: [PATCH] rockchip: honor recovery before distro boot
+
+Apply after 0001-rockchip-extlinux-fdtoverlays.patch. A BCB or reboot
+recovery request must select the vendor recovery loader before extlinux
+can boot the normal system. Change only the in-memory bootcmd, never
+persist a recovery override to the environment.
+
+--- a/arch/arm/mach-rockchip/boot_mode.c
++++ b/arch/arm/mach-rockchip/boot_mode.c
+@@ -259,6 +259,10 @@
+ 		env_set("preboot", "setenv preboot; download");
+ 		run_command("download", 0);
+ 		break;
++	case BOOT_MODE_RECOVERY:
++		/* Recovery must bypass the normal distro/extlinux path. */
++		env_set("bootcmd", RKIMG_VENDOR_BOOTCOMMAND);
++		break;
+ 	case BOOT_MODE_CHARGING:
+ 		printf("enter charging!\n");
+ 		env_set("preboot", "setenv preboot; charge");

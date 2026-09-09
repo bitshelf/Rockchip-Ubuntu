@@ -31,7 +31,7 @@ RUN chmod 0755 /usr/local/sbin/configure-cross-apt \
            echo "unsupported build pair: ${native_arch} -> ${TARGET_DEB_ARCH}" >&2; \
            exit 1; \
        fi \
-    && packages="$packages crossbuild-essential-arm64 binutils-aarch64-linux-gnu libc6-dev:arm64" \
+    && packages="$packages crossbuild-essential-arm64 binutils-aarch64-linux-gnu dpkg-dev patch libc6-dev:arm64 libbz2-dev:arm64 libcurl4-openssl-dev:arm64" \
     && apt-get update \
     && apt-get install --yes --no-install-recommends $packages \
     && rm -rf /var/lib/apt/lists/*

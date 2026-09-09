@@ -25,6 +25,12 @@ jobs:
       - name: Check SDK platform assets
         run: ./scripts/stage-sdk-assets.sh --check
 
+      - name: Check staged updateEngine source
+        run: ./build.sh update-engine --check
+
+      - name: Build updateEngine package
+        run: ./build.sh update-engine
+
       - name: Build server rootfs
         run: ./build.sh server
 

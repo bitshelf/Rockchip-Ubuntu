@@ -31,7 +31,7 @@ PARTUUID，因此不会被复制。
 DTS_OVERLAY_DIR="$PWD/build/customer-overlays" ./build.sh bootfs
 ```
 
-x86 默认产物为 `build/images/bootfs-<soc>.img`，ARM64 默认位于
+x86 默认产物为 `build/images/boot-<soc>.img`，ARM64 默认位于
 `/var/lib/ubuntu-ci/build/images/`。若 `.env` 设置了 `BUILD_OUTPUT_DIR`、
 `SOC_MODEL` 或 `PLATFORM_ASSET_DIR`，手工构建和 CI 会读取同一位置。
 
@@ -43,9 +43,9 @@ BOOTFS_INITRD=/absolute/path/to/initrd.img ./build.sh bootfs
 
 输出包括：
 
-- `bootfs-<soc>.img`：256 MiB ext4 bootfs；
-- `bootfs-<soc>.img.sha256`：完整镜像校验；
-- `bootfs-<soc>.img.build-info`：输入 bundle、内核版本和文件系统策略证据。
+- `boot-<soc>.img`：256 MiB ext4 bootfs；
+- `boot-<soc>.img.sha256`：完整镜像校验；
+- `boot-<soc>.img.build-info`：输入 bundle、内核版本和文件系统策略证据。
 
 镜像内布局为：
 
@@ -89,3 +89,6 @@ U-Boot 兼容特性，编译并安装一份测试 `.dtso`，按 extlinux 顺序�
 Forgejo 的 Server workflow 先生成 Server rootfs，再执行 `./build.sh overlay-root`；
 后者调用同一个 bootfs 构建器，将 ARM64 原生生成的 initramfs 一并写入 bootfs，
 并保留相同的 SHA256 和 build-info 离线验收契约。
+
+boot 文件系统写入唯一的 GPT `boot` 分区，不再同时安装另一份 FIT 内核。
+参见 [内核升级设计](BOOT-UPDATE-DESIGN.md)。

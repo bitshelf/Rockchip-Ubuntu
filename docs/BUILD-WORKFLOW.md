@@ -90,6 +90,13 @@ CROSS_BASE_TAG="<ubuntu-base-tag>" ./scripts/cross-build-env.sh --check
 完整配置、使用方式和版本迁移步骤见
 [CROSS-COMPILE.md](CROSS-COMPILE.md)。
 
+## Recovery OTA
+
+`updateEngine` 从 SDK 的干净源码提交构建为 ARM64 DEB，并在 EROFS 合成阶段安装。
+update.img 与 OTA image 直接使用 SDK 的 `edit-package-file`、
+`edit-ota-package-file`、`updateimg` 和 `ota-updateimg`，不复制 Rockchip 工具、
+不维护固定分区 mask。见 [OTA.md](OTA.md)。
+
 ## U-Boot extlinux/FDTOVERLAYS
 
 Rockchip U-Boot 2017.09 的 extlinux 启动接入、FDT overlay 回移、RKIMG 回退和

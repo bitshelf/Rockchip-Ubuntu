@@ -1,0 +1,76 @@
+From: Ubuntu Embedded Team
+Subject: [PATCH] updateEngine: report misc display read failures and success
+
+Display previously returned the default upgrade error after successful reads
+and ignored read failures. Propagate errors, bound fixed-size BCB strings,
+and return directly so a read-only display never reaches the reboot path.
+
+--- a/bootloader.h
++++ b/bootloader.h
+@@ -128,7 +128,7 @@
+ 
+ int setSlotActivity();
+ int setSlotSucceed();
+-void miscDisplay() ;
++int miscDisplay(void);
+ int wipe_userdata(int auto_reboot);
+ int writeCustomMiscCmdline(void);
+ int readCustomMiscCmdline(void);
+--- a/update_engine/main.c
++++ b/update_engine/main.c
+@@ -306,7 +306,7 @@
+                 m_status = RK_UPGRADE_FINISHED;
+             }
+         } else if (strcmp(misc_func, "display") == 0) {
+-            miscDisplay();
++            return miscDisplay() == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+         } else {
+             LOGE("unknow misc cmdline : %s.\n", misc_func);
+             return 0;
+--- a/update_engine/rkbootloader.c
++++ b/update_engine/rkbootloader.c
+@@ -573,13 +573,14 @@
+ /*
+ * 显示MISC 分区的所有内容，方便调试
+ */
+-void miscDisplay()
++int miscDisplay(void)
+ {
+     // 显示A/B 分区的misc 信息
+     LOGI("===============Linux A/B=============\n");
+     struct AvbABData info_ab;
+-    readABMisc(&info_ab);
+-    LOGI("magic : %s.\n", info_ab.magic);
++    if (readABMisc(&info_ab) != 0)
++        return -1;
++    LOGI("magic : %.*s.\n", (int)sizeof(info_ab.magic), info_ab.magic);
+     LOGI("version_major = %d.\n", info_ab.version_major);
+     LOGI("version_minor = %d.\n", info_ab.version_minor);
+     for (int i = 0; i < 2; i++) {
+@@ -597,15 +598,18 @@
+     LOGI("==============wipe================\n");
+     // 显示recovery 的misc 信息
+     char cmdline[20];
+-    readCmdMisc(cmdline, sizeof(cmdline));
+-    LOGI("cmdline = %s.\n", cmdline);
++    if (readCmdMisc(cmdline, sizeof(cmdline)) != 0)
++        return -1;
++    LOGI("cmdline = %.*s.\n", (int)sizeof(cmdline), cmdline);
+     LOGI("==============recovery============\n");
+ 
+     struct bootloader_message boot;
+-    get_bootloader_message(&boot);
+-    LOGI("bootloader.command = %s.\n", boot.command);
+-    LOGI("bootloader.recovery = %s.\n", boot.recovery);
+-    LOGI("bootloader.status = %s.\n", boot.status);
++    if (get_bootloader_message(&boot) != 0)
++        return -1;
++    LOGI("bootloader.command = %.*s.\n", (int)sizeof(boot.command), boot.command);
++    LOGI("bootloader.recovery = %.*s.\n", (int)sizeof(boot.recovery), boot.recovery);
++    LOGI("bootloader.status = %.*s.\n", (int)sizeof(boot.status), boot.status);
+     LOGI("bootloader.needupdate = %x.\n", *((int *)boot.needupdate));
+-    LOGI("bootloader.systemFlag = %s.\n", boot.systemFlag);
+-}
++    LOGI("bootloader.systemFlag = %.*s.\n", (int)sizeof(boot.systemFlag), boot.systemFlag);
++    return 0;
++}

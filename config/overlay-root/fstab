@@ -1,5 +1,5 @@
-# bootfs remains independently writable for kernel, initrd and DT updates.
-PARTLABEL=bootfs /boot ext4 defaults,nofail,noatime,nodev,nosuid,noexec,errors=remount-ro,x-systemd.device-timeout=10s 0 2
+# The sole normal boot filesystem contains kernel, initrd and device trees.
+PARTLABEL=boot /boot ext4 defaults,nofail,noatime,nodev,nosuid,noexec,errors=remount-ro,x-systemd.device-timeout=10s 0 2
 
 # PARTLABEL=userdata is mounted by initramfs before switch_root. Do not mount
 # it again from fstab; its diagnostic view is /var/lib/overlay-root.
