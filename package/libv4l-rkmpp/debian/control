@@ -1,0 +1,13 @@
+Source: libv4l-rkmpp
+Section: video
+Priority: optional
+Maintainer: Ubuntu image CI <root@localhost>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/JeffyCN/libv4l-rkmpp
+
+Package: libv4l-rkmpp1
+Architecture: arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}, librockchip-mpp1 (>= 1.5.0), libv4l-0t64
+Description: libv4l2 plugin bridging V4L2 to Rockchip MPP
+ Maps virtual V4L2 decoder and encoder endpoints to the Rockchip mpp_service.
