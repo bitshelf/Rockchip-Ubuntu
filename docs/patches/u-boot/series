@@ -1,0 +1,4 @@
+0001-rockchip-extlinux-fdtoverlays.patch
+0002-honor-recovery-before-distro-boot.patch
+0003-load-early-dtb-from-boot-partition.patch
+0005-load-boot-logos-from-ext4-bootfs.patch

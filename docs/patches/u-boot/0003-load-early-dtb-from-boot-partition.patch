@@ -1,0 +1,61 @@
+From: Ubuntu Embedded Team <builder@localhost>
+Subject: [PATCH] rockchip: locate early distro DTB in GPT boot partition
+
+The ext4 bootfs replaces the RKIMG resource image. Resolve the boot GPT
+partition by name before driver probing, independent of legacy boot flags.
+Enable ROCKCHIP_EARLY_DISTRO_DTB with path /dtb/board.dtb in the build config.
+
+diff --git a/arch/arm/mach-rockchip/boot_rkimg.c b/arch/arm/mach-rockchip/boot_rkimg.c
+index 4aed2a3..47893ed 100644
+--- a/arch/arm/mach-rockchip/boot_rkimg.c
++++ b/arch/arm/mach-rockchip/boot_rkimg.c
+@@ -434,31 +434,34 @@ static int fdt_check_hash(void *fdt_addr, u32 fdt_size,
+ #if defined(CONFIG_ROCKCHIP_EARLY_DISTRO_DTB)
+ static int rockchip_read_distro_dtb(void *fdt_addr)
+ {
+-	const char *cmd = "part list ${devtype} ${devnum} -bootable devplist";
+-	char *devnum, *devtype, *devplist;
+-	char devnum_part[12];
++	struct blk_desc *desc;
++	disk_partition_t info;
++	int part;
++	char *devnum, *devtype;
++	char devnum_part[32];
+ 	char fdt_hex_str[19];
+ 	char *fs_argv[5];
+ 
+-	if (!rockchip_get_bootdev() || !fdt_addr)
++	desc = rockchip_get_bootdev();
++	if (!desc || !fdt_addr)
+ 		return -ENODEV;
+ 
+-	if (run_command_list(cmd, -1, 0)) {
+-		printf("Failed to find -bootable\n");
+-		return -EINVAL;
+-	}
+-
+-	devplist = env_get("devplist");
+-	if (!devplist)
+-		devplist = "1";
++	/* Ubuntu bootfs uses GPT name boot, without a legacy-bootable flag. */
++	part = part_get_info_by_name(desc, "boot", &info);
++	if (part < 0)
++		return part;
+ 
+ 	devtype = env_get("devtype");
+ 	devnum = env_get("devnum");
+-	sprintf(devnum_part, "%s:%s", devnum, devplist);
+-	sprintf(fdt_hex_str, "0x%lx", (ulong)fdt_addr);
++	if (!devtype || !*devtype || !devnum || !*devnum)
++		return -EINVAL;
++	if (snprintf(devnum_part, sizeof(devnum_part), "%s:%x", devnum, part) >=
++	    sizeof(devnum_part))
++		return -ENAMETOOLONG;
++	snprintf(fdt_hex_str, sizeof(fdt_hex_str), "0x%lx", (ulong)fdt_addr);
+ 
+ 	fs_argv[0] = "load";
+-	fs_argv[1] = devtype,
++	fs_argv[1] = devtype;
+ 	fs_argv[2] = devnum_part;
+ 	fs_argv[3] = fdt_hex_str;
+ 	fs_argv[4] = CONFIG_ROCKCHIP_EARLY_DISTRO_DTB_PATH;

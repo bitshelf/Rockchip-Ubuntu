@@ -1,0 +1,86 @@
+From: Ubuntu Embedded Team <builder@localhost>
+Subject: [PATCH] rockchip: load distro BMP logos from ext4 bootfs
+
+Preserve vendor RKIMG fallback while allowing the Ubuntu boot filesystem
+to provide /logos/logo.bmp and /logos/logo_kernel.bmp. Bound read size and
+propagate filesystem I/O errors; do not silently substitute legacy data.
+
+diff --git a/arch/arm/mach-rockchip/resource_img.c b/arch/arm/mach-rockchip/resource_img.c
+index b80af4a..4c32d58 100644
+--- a/arch/arm/mach-rockchip/resource_img.c
++++ b/arch/arm/mach-rockchip/resource_img.c
+@@ -7,6 +7,8 @@
+ #include <boot_rkimg.h>
+ #include <bmp_layout.h>
+ #include <malloc.h>
++#include <fs.h>
++#include <part.h>
+ #include <asm/unaligned.h>
+ #include <linux/libfdt.h>
+ #include <linux/list.h>
+@@ -438,6 +440,52 @@ static struct resource_file *resource_get_file(const char *name)
+ 	return NULL;
+ }
+ 
++#if defined(CONFIG_ROCKCHIP_EARLY_DISTRO_DTB)
++/* Ubuntu's ext4 boot partition carries logos separately from RKIMG. */
++static int rockchip_read_distro_logo(void *buf, const char *name,
++                                    int blk_offset, int len)
++{
++	struct blk_desc *desc = rockchip_get_bootdev();
++	disk_partition_t info;
++	loff_t size, offset, count, actual;
++	char path[32];
++	int part;
++
++	if (strcmp(name, "logo.bmp") && strcmp(name, "logo_kernel.bmp"))
++		return -ENOENT;
++	if (!desc)
++		return -ENODEV;
++	if (blk_offset < 0)
++		return -EINVAL;
++	part = part_get_info_by_name(desc, "boot", &info);
++	if (part < 0)
++		return part;
++	if (fs_set_blk_dev_with_part(desc, part))
++		return -EIO;
++	snprintf(path, sizeof(path), "/logos/%s", name);
++	/* Missing files may use RKIMG fallback; size/read errors must not. */
++	if (!fs_exists(path))
++		return -ENOENT;
++	if (fs_set_blk_dev_with_part(desc, part) || fs_size(path, &size))
++		return -EIO;
++	/* Keep filesystem reads bounded even for malformed input assets. */
++	if (size <= 0 || size > 16 * 1024 * 1024)
++		return -EFBIG;
++	offset = (loff_t)blk_offset * RK_BLK_SIZE;
++	if (offset >= size)
++		return -EINVAL;
++	count = size - offset;
++	if (len > 0 && len < count)
++		count = len;
++	/* fs_size closes the filesystem; select the same partition again. */
++	if (fs_set_blk_dev_with_part(desc, part) ||
++	    fs_read(path, (ulong)buf, offset, count, &actual) || actual != count)
++		return -EIO;
++	printf("Logo(Distro): %s, %lld bytes\n", path, actual);
++	return actual;
++}
++#endif
++
+ int rockchip_read_resource_file(void *buf, const char *name, int blk_offset, int len)
+ {
+ 	struct blk_desc *desc;
+@@ -445,6 +493,12 @@ int rockchip_read_resource_file(void *buf, const char *name, int blk_offset, int
+ 	int blk_cnt;
+ 	int blksz;
+ 	ulong pos;
++#if defined(CONFIG_ROCKCHIP_EARLY_DISTRO_DTB)
++	int distro_len = rockchip_read_distro_logo(buf, name, blk_offset, len);
++
++	if (distro_len != -ENOENT)
++		return distro_len;
++#endif
+ 
+ 	f = resource_get_file(name);
+ 	if (!f) {
