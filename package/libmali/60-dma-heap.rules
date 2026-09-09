@@ -1,0 +1,3 @@
+# Rockchip libmali's GBM backend allocates through the dma-buf heaps. Keep
+# these nodes usable by headless services and by unprivileged desktop sessions.
+SUBSYSTEM=="dma_heap", MODE="0666"

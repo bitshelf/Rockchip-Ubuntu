@@ -239,6 +239,7 @@ install -D -m 0644 \
     "$rootfs/etc/initramfs-tools/conf.d/overlay-root"
 install -d -m 0755 "$rootfs/boot" "$rootfs/var/lib/overlay-root"
 "${SCRIPT_DIR}/install-adb.sh" "$rootfs"
+"${SCRIPT_DIR}/install-libmali.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 
 module_source="${PLATFORM_ASSET_DIR}/modules/lib/modules/${kernel_release}"
 module_target="$rootfs/lib/modules/${kernel_release}"
