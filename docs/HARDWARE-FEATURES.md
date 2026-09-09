@@ -18,6 +18,11 @@ WebGPU/Vulkan 后端、硬件证明及限制见 WEBGPU-VULKAN-QA.md。
 RGA runtime 随镜像安装，但开发包只用于构建验收工具。目标板 QA 必须完成真实
 dma-buf color fill、同步读回并输出 `RGA_SMOKE_OK`，见 [RGA.md](RGA.md)。
 
+## MPP 视频编解码
+
+MPP runtime 和验收工具随镜像安装。目标板必须完成同一 H.264 bitstream 的 100 帧
+硬件编码和 100 帧硬件解码，见 [MPP.md](MPP.md)。
+
 ## ADB 调试
 
 ADB 使用 Ubuntu `adbd` 和通用 USB FunctionFS gadget，保持 root shell 与 host
