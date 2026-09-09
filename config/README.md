@@ -24,3 +24,6 @@ SDK binary input selection is declared separately from product/rootfs policy:
 - `kernel-modules/modules.conf` selects the small set of SDK KO files;
 - `local-debs/packages.conf` selects local SDK Debian packages and their
   expected target architecture.
+
+Independent boot filesystem policy is kept in `bootfs/bootfs.conf`; the
+builder consumes verified platform assets and does not encode board filenames.

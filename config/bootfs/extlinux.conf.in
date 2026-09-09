@@ -1,0 +1,10 @@
+menu title Ubuntu boot menu
+timeout @TIMEOUT@
+default ubuntu
+
+label ubuntu
+    linux /Image
+@INITRD_LINE@
+    fdt /dtb/@DTB_NAME@
+@OVERLAY_LINE@
+    append @CMDLINE@

@@ -44,6 +44,18 @@ SHA256 清单，再同步到 ARM64 手工构建和 Forgejo CI 共用的构建输
 
 目录布局、同步和验收方法见 [SDK-ASSETS.md](SDK-ASSETS.md)。
 
+## 独立 bootfs
+
+已同步 platform-assets 后，可在 x86、ARM64 或 Forgejo host runner 上生成相同的
+ext4 bootfs。生成与验收均不需要挂载镜像：
+
+```bash
+./build.sh bootfs
+./build.sh bootfs --check
+```
+
+产物布局、板级策略和离线验收项见 [BOOTFS.md](BOOTFS.md)。
+
 ## x86 交叉编译 ARM64
 
 在 x86_64 主机使用 GNU AArch64 交叉工具链。宿主机可以是 Debian 或 Ubuntu，
