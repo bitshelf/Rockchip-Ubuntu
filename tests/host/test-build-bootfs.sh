@@ -12,14 +12,20 @@ asset_dir="${tmp_dir}/platform-assets/test-soc"
 install -d "$asset_dir/boot" \
     "$asset_dir/modules/lib/modules/6.99-test/kernel/drivers/test" \
     "$asset_dir/debs"
-printf 'schema=ubuntu-platform-assets-v3\n' >"$asset_dir/.platform-asset-root"
-printf 'schema=ubuntu-platform-assets-v3\nsoc=test-soc\n' >"$asset_dir/asset-info"
+printf 'schema=ubuntu-platform-assets-v4\n' >"$asset_dir/.platform-asset-root"
+printf 'schema=ubuntu-platform-assets-v4\nsoc=test-soc\n' >"$asset_dir/asset-info"
 printf 'kernel\n' >"$asset_dir/boot/Image"
+cp "${PROJECT_DIR}/config/kernel/overlay-root.conf" "$asset_dir/boot/kernel.config"
 printf '6.99-test\n' >"$asset_dir/kernel-release"
 printf 'module\n' \
     >"$asset_dir/modules/lib/modules/6.99-test/kernel/drivers/test/test.ko"
 printf 'drivers/test/test.ko\tkernel/drivers/test/test.ko\ttest\n' \
     >"$asset_dir/module-manifest.tsv"
+printf 'kernel/fs/overlayfs/overlay.ko\n' \
+    >"$asset_dir/modules/lib/modules/6.99-test/modules.builtin"
+printf 'kernel/fs/overlayfs/overlay.ko: alias=fs-overlay\n' \
+    >"$asset_dir/modules/lib/modules/6.99-test/modules.builtin.modinfo"
+
 cat >"${tmp_dir}/base.dts" <<'EOF'
 /dts-v1/;
 / { compatible = "test,board"; };

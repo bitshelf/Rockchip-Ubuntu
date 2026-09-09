@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+[ "${1:-}" = prereqs ] && { prereqs; exit 0; }
+
+# shellcheck source=/dev/null
+. /usr/share/initramfs-tools/hook-functions
+
+# OverlayFS is required as a built-in by config/kernel/overlay-root.conf. Keep
+# this call so a future modular kernel is still rejected or copied explicitly.
+manual_add_modules overlay
+copy_exec /usr/sbin/blkid /usr/sbin
+copy_exec /usr/sbin/e2fsck /usr/sbin
+copy_exec /usr/sbin/resize2fs /usr/sbin
+copy_file config /etc/overlay-root.conf /conf/overlay-root.conf

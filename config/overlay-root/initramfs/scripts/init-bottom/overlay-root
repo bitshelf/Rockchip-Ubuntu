@@ -1,0 +1,69 @@
+#!/bin/sh
+set -e
+
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+[ "${1:-}" = prereqs ] && { prereqs; exit 0; }
+
+# shellcheck source=/dev/null
+. /scripts/functions
+
+[ -r /conf/overlay-root.conf ] || panic "missing overlay-root configuration"
+# This is a root-owned file copied by the initramfs hook.
+# shellcheck disable=SC1091
+. /conf/overlay-root.conf
+
+case "${OVERLAY_ROOT_DATA_DEVICE:-}" in
+    /dev/*) ;;
+    *) panic "OVERLAY_ROOT_DATA_DEVICE must be below /dev" ;;
+esac
+[ "${OVERLAY_ROOT_DATA_FSTYPE:-}" = ext4 ] ||
+    panic "overlay upper filesystem must be ext4"
+[ -n "${OVERLAY_ROOT_DATA_LABEL:-}" ] || panic "missing overlay data label"
+
+lower=/run/overlay-root-lower
+data=/run/overlay-root-data
+merged=/run/overlay-root-merged
+
+wait_for_udev 10
+[ -b "$OVERLAY_ROOT_DATA_DEVICE" ] ||
+    panic "overlay data device is unavailable: $OVERLAY_ROOT_DATA_DEVICE"
+
+fstype="$(blkid -s TYPE -o value "$OVERLAY_ROOT_DATA_DEVICE" 2>/dev/null || true)"
+[ "$fstype" = "$OVERLAY_ROOT_DATA_FSTYPE" ] ||
+    panic "overlay data must be ext4; refusing to format type: ${fstype:-unknown}"
+fslabel="$(blkid -s LABEL -o value "$OVERLAY_ROOT_DATA_DEVICE" 2>/dev/null || true)"
+[ "$fslabel" = "$OVERLAY_ROOT_DATA_LABEL" ] ||
+    panic "overlay data label is ${fslabel:-missing}, expected $OVERLAY_ROOT_DATA_LABEL"
+
+# A power cut can leave a journal replay or orphan cleanup pending. Repair the
+# unmounted upper filesystem before it is exposed; never turn a read failure
+# into an automatic mkfs operation.
+set +e
+e2fsck -pf "$OVERLAY_ROOT_DATA_DEVICE" >/dev/console 2>&1
+fsck_rc=$?
+set -e
+case "$fsck_rc" in
+    0|1) ;;
+    *) panic "overlay data fsck failed ($fsck_rc)" ;;
+esac
+resize2fs "$OVERLAY_ROOT_DATA_DEVICE" >/dev/console 2>&1 ||
+    panic "cannot grow overlay data filesystem"
+
+mkdir -p "$lower" "$data" "$merged"
+mount -o rw,noatime "$OVERLAY_ROOT_DATA_DEVICE" "$data" ||
+    panic "cannot mount overlay data filesystem"
+mkdir -p "$data/upper" "$data/work"
+
+# rootmnt is supplied by initramfs-tools /scripts/functions.
+# shellcheck disable=SC2154
+mount --move "$rootmnt" "$lower"
+mount -o remount,ro "$lower" || panic "cannot remount EROFS lower read-only"
+mount -t overlay overlay \
+    -o "lowerdir=$lower,upperdir=$data/upper,workdir=$data/work" \
+    "$merged" || panic "cannot assemble root OverlayFS"
+
+mkdir -p "$merged/.rootfs-ro" "$merged/var/lib/overlay-root"
+mount --move "$lower" "$merged/.rootfs-ro"
+mount --move "$data" "$merged/var/lib/overlay-root"
+mount --move "$merged" "$rootmnt"

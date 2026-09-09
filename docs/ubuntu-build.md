@@ -58,6 +58,10 @@ dpkg 状态数据库、rootfs APT 镜像源、cloud-init 临时登录数据，�
 中的 `openssh-server`。这些检查只证明 rootfs 构建完整；启动、板级网络、内核
 驱动和硬件功能必须由对应后续功能验收。
 
+Server tarball 同时携带 `initramfs-tools` 和 `e2fsprogs`，供后续
+`./build.sh overlay-root` 生成板级 initramfs；基础 tarball 本身仍不是 EROFS
+或 OverlayFS 产物。
+
 `qa.json` 记录本次 tarball 校验和与最小检查结果。
 
 镜像通过 cloud-init 创建临时 `ubuntu` 账号，初始密码为 `ubuntu`，首次登录

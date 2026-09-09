@@ -58,6 +58,10 @@ grep -Fq 'openssh-server' "$DEFINITION" ||
     fail "Server SSH package is missing"
 grep -Fq 'device-tree-compiler' "$DEFINITION" ||
     fail "DTS overlay target validation tools are missing"
+grep -Fq 'initramfs-tools' "$DEFINITION" ||
+    fail "Overlay-root initramfs package is missing"
+grep -Fq 'e2fsprogs' "$DEFINITION" ||
+    fail "userdata recovery tools are missing"
 if grep -Eq '\$\{UI_OUTPUT\}/ubuntu-[0-9]' "$BUILD_SCRIPT"; then
     fail "ubuntu-image output names are hard-coded in the build script"
 fi
