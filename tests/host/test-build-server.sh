@@ -69,6 +69,8 @@ if grep -Eq '\$\{UI_OUTPUT\}/ubuntu-[0-9]' "$BUILD_SCRIPT"; then
 fi
 grep -Fq 'find_single_artifact' "$BUILD_SCRIPT" ||
     fail "ubuntu-image outputs are not discovered from the output directory"
+grep -Fq 'chromium, channel: latest\/stable' "$BUILD_SCRIPT" ||
+    fail "GNOME does not resolve Chromium from the current ARM64 stable channel"
 if grep -Eni 'erofs|overlayfs|dtbo|\.ko|weston|chromium|rime' "$DEFINITION"; then
     fail "a later feature leaked into the base Server definition"
 fi

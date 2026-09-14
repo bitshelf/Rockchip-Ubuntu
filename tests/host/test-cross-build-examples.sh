@@ -8,7 +8,7 @@ trap 'rm -rf -- "$tmp_dir"' EXIT
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-for spec in 'libdrm:libdrm:deb'; do
+for spec in 'libdrm:libdrm:deb' 'chromium:chromium:deb'; do
     IFS=: read -r example source format <<<"$spec"
     output="$(CROSS_BASE_TAG=future-release \
         CROSS_OUTPUT_DIR="${tmp_dir}/output" \
@@ -21,7 +21,7 @@ for spec in 'libdrm:libdrm:deb'; do
         fail "wrong package format: $example"
 done
 
-for document in CROSS-LIBDRM.md; do
+for document in CROSS-LIBDRM.md CROSS-CHROMIUM.md; do
     [[ -s "${PROJECT_DIR}/docs/${document}" ]] || fail "missing example document: $document"
 done
 grep -Fq 'dpkg-buildpackage --host-arch arm64' \
@@ -46,5 +46,14 @@ if grep -REn 'drm(Set|Drop)Master|drm(Get|Auth)Magic|name = "rockchip"' \
         "${libdrm_config}/patches"; then
     fail "libdrm patch set changes global DRM selection or authentication semantics"
 fi
+grep -Fq 'target_cpu = "arm64"' \
+    "${PROJECT_DIR}/package/chromium/args.gn" ||
+    fail "Chromium GN target is not ARM64"
+grep -Fq 'dpkg-deb --build' \
+    "${PROJECT_DIR}/package/chromium/pack-deb.sh" ||
+    fail "Chromium example does not create a DEB"
+grep -Fq 'apply_rk3576_patches' \
+    "${PROJECT_DIR}/package/chromium/build-in-container.sh" ||
+    fail "Chromium current-version patch hook is unavailable"
 
-echo "libdrm cross-build checks passed"
+echo "Cross-build example checks passed"

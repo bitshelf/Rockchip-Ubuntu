@@ -96,3 +96,9 @@ CROSS_BUILD_ENV_OK
 APT suite 从容器的 `/etc/os-release` 动态读取，因此迁移版本时不需要修改
 脚本中的发行代号。若新版本改变了包名或工具链 ABI，应作为独立功能修改并
 重新执行交叉编译验收。
+
+## 编译与打包示例
+
+- [libdrm](CROSS-LIBDRM.md)：使用目标 Ubuntu 版本的 source package，产出 DEB；
+- [Wayland](CROSS-WAYLAND.md)：使用目标 Ubuntu 版本的 source package，产出 DEB；
+- [Chromium](CROSS-CHROMIUM.md)：使用上游 ARM64 sysroot 交叉编译，产出 ARM64 DEB。

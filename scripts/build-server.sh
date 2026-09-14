@@ -4,10 +4,11 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MODE=build
+VARIANT=server
 
 usage() {
     cat <<'EOF'
-usage: scripts/build-server.sh [--check]
+usage: scripts/build-server.sh [--variant server|desktop] [--check]
 
 Build an Ubuntu 26 Server ARM64 rootfs with ubuntu-image. The build supports
 native ARM64 and x86_64 hosts with qemu-aarch64 binfmt registration.
@@ -44,13 +45,16 @@ host_arch() {
     esac
 }
 
-case "${1:-}" in
-    "") ;;
-    --check) MODE=check ;;
-    -h|--help) usage; exit 0 ;;
-    *) usage >&2; exit 2 ;;
-esac
-(( $# <= 1 )) || { usage >&2; exit 2; }
+BUILD_ARGS=("$@")
+while (( $# > 0 )); do
+    case "$1" in
+        --variant) VARIANT="${2:-}"; (( $# >= 2 )) || { usage >&2; exit 2; }; shift 2 ;;
+        --check) MODE=check; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+[[ "$VARIANT" == server || "$VARIANT" == desktop ]] || die "unsupported variant: $VARIANT"
 
 declare -A CALLER_ENV=()
 for env_name in BUILD_OUTPUT_DIR UBUNTU_PORTS_MIRROR UBUNTU_IMAGE APT_PROXY \
@@ -73,7 +77,6 @@ done
 UBUNTU_SERIES=resolute
 UBUNTU_VERSION=26.04
 ARCHITECTURE=arm64
-VARIANT=server
 HOST_ARCH="$(host_arch)"
 if [[ "$HOST_ARCH" == arm64 ]]; then
     BUILD_OUTPUT_DIR="${BUILD_OUTPUT_DIR:-/var/lib/ubuntu-ci/build}"
@@ -90,7 +93,7 @@ WORK_DIR="${BUILD_OUTPUT_DIR}/work/${UBUNTU_SERIES}-${VARIANT}"
 UI_OUTPUT="${WORK_DIR}/output"
 UI_WORK="${WORK_DIR}/ubuntu-image"
 SEED_CACHE_ROOT="${BUILD_OUTPUT_DIR}/cache/ubuntu-image-seeds/${UBUNTU_SERIES}"
-DEFINITION_TEMPLATE="${PROJECT_DIR}/config/ubuntu-image/${UBUNTU_SERIES}-${VARIANT}-${ARCHITECTURE}.yaml.in"
+DEFINITION_TEMPLATE="${PROJECT_DIR}/config/ubuntu-image/${UBUNTU_SERIES}-server-${ARCHITECTURE}.yaml.in"
 DEFINITION="${WORK_DIR}/${UBUNTU_SERIES}-${VARIANT}-${ARCHITECTURE}.yaml"
 APT_POLICY="${PROJECT_DIR}/config/ubuntu-image/apt.conf"
 
@@ -105,6 +108,10 @@ APT_POLICY="${PROJECT_DIR}/config/ubuntu-image/apt.conf"
 [[ -f "$APT_POLICY" ]] ||
     die "missing rootfs APT policy: $APT_POLICY"
 
+if [[ "$VARIANT" == desktop ]]; then
+    [[ -s "${PROJECT_DIR}/config/ubuntu-image/desktop.packages" ]] || die "missing GNOME package list"
+fi
+
 for tool in awk findmnt git install jq sed sha256sum tar umount wget; do
     command -v "$tool" >/dev/null || die "missing build dependency: $tool"
 done
@@ -116,7 +123,7 @@ if [[ "$HOST_ARCH" == amd64 ]]; then
 fi
 
 if [[ "$MODE" == check ]]; then
-    info "Server build configuration is valid"
+    info "${VARIANT} build configuration is valid"
     echo "host.arch=${HOST_ARCH}"
     echo "image=${UBUNTU_SERIES}/${UBUNTU_VERSION}/${VARIANT}/${ARCHITECTURE}"
     echo "output=${BUILD_OUTPUT_DIR}"
@@ -126,7 +133,7 @@ fi
 
 if [[ "$EUID" -ne 0 ]]; then
     exec sudo --preserve-env=BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
-        "$0" "$@"
+        "$0" "${BUILD_ARGS[@]}"
 fi
 
 cleanup_mounts() {
@@ -214,7 +221,21 @@ sed -e "s|@UBUNTU_PORTS_MIRROR@|${mirror}|g" \
     -e "s|@SEED_CACHE_ROOT@|${SEED_CACHE_ROOT}|g" \
     "$DEFINITION_TEMPLATE" >"$DEFINITION"
 
-info "Build Ubuntu ${UBUNTU_VERSION} Server ARM64 rootfs on ${HOST_ARCH}"
+if [[ "$VARIANT" == desktop ]]; then
+    # Reuse the Server seed and account policy. Only the explicit GNOME package
+    # list differs; desktop metapackages would pull excluded product payloads.
+    desktop_packages="${PROJECT_DIR}/config/ubuntu-image/desktop.packages"
+    extra_packages="${WORK_DIR}/desktop-extra-packages.yaml"
+    awk 'NF && $1 !~ /^#/ {printf "    - {name: %s}\n", $1}' \
+        "$desktop_packages" >"$extra_packages"
+    sed -i -e 's/name: ubuntu-server-arm64/name: ubuntu-desktop-arm64/' \
+        -e 's/display-name: Ubuntu Server arm64/display-name: Ubuntu GNOME arm64/' \
+        -e 's/ubuntu-26.04-server-arm64/ubuntu-26.04-desktop-arm64/g' \
+        -e 's/extra-snaps: \[{name: snapd}\]/extra-snaps: [{name: snapd}, {name: bare}, {name: core22}, {name: core24}, {name: gtk-common-themes, channel: latest\/stable}, {name: gnome-46-2404, channel: latest\/stable}, {name: mesa-2404, channel: latest\/stable}, {name: cups, channel: latest\/stable}, {name: chromium, channel: latest\/stable}]/' \
+        -e "/^  extra-packages:/r $extra_packages" "$DEFINITION"
+fi
+
+info "Build Ubuntu ${UBUNTU_VERSION} ${VARIANT} ARM64 rootfs on ${HOST_ARCH}"
 http_proxy="${APT_PROXY:-}" https_proxy="" no_proxy="127.0.0.1,localhost" \
     "$UBUNTU_IMAGE" classic --workdir "$UI_WORK" --output-dir "$UI_OUTPUT" \
     --debug --thru create_chroot "$DEFINITION" 2>&1 |
@@ -256,7 +277,7 @@ fi
 source_tree_sha256="$(cd "$PROJECT_DIR" && {
     {
         printf '%s\0' AGENTS.md README.md build.sh .env.example .gitignore
-        find config docs scripts tests -type f -print0
+        find config docs scripts tests package -type f ! -path '*/__pycache__/*' -print0
     } | sort -z | while IFS= read -r -d '' source_file; do
         [[ "$source_file" != config/ubuntu-image/customization* ]] || continue
         sha256sum "$source_file"
@@ -307,6 +328,8 @@ grep -q '^openssh-server[[:space:]]' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" 
     die "rootfs manifest does not contain openssh-server"
 grep -q '^adbd[[:space:]]' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
     die "rootfs manifest does not contain adbd"
+"${SCRIPT_DIR}/check-desktop-manifest.sh" "$VARIANT" "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest"
+
 for forbidden in linux-firmware linux-firmware-raspi unattended-upgrades \
         ubuntu-release-upgrader-core thunderbird; do
     ! grep -Eq "^${forbidden}([[:space:]]|-)" \
@@ -316,18 +339,19 @@ done
 ! grep -Eq '^libreoffice([[:space:]]|-)' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
     die "forbidden LibreOffice package was selected by the source seed"
 jq -n \
-    --arg schema ubuntu-server-rootfs-qa-v1 \
+    --arg schema ubuntu-rootfs-qa-v1 \
+    --arg variant "$VARIANT" \
     --arg result pass \
     --arg image "${IMAGE_BASENAME}.rootfs.tar.gz" \
     --arg sha256 "$(awk '{print $1}' "${IMAGES_DIR}/${IMAGE_BASENAME}.rootfs.tar.gz.sha256")" \
     --arg source_tree_sha256 "$source_tree_sha256" \
-    '{schema: $schema, result: $result, image: $image, sha256: $sha256,
+    '{schema: $schema, result: $result, variant: $variant, image: $image, sha256: $sha256,
       source_tree_sha256: $source_tree_sha256,
       checks: ["rootfs.os-release", "rootfs.dpkg-status", "rootfs.apt-mirror",
                "rootfs.firstboot-no-preset-account", "package.openssh-server", "package.adbd",
-               "packages.forbidden-absent"]}' \
+               "packages.forbidden-absent", "packages.variant-boundary"]}' \
     >"${IMAGES_DIR}/${IMAGE_BASENAME}.qa.json"
 chown "${SUDO_UID:-0}:${SUDO_GID:-0}" "${IMAGES_DIR}/${IMAGE_BASENAME}."*
 
 info "Artifact: ${IMAGES_DIR}/${IMAGE_BASENAME}.rootfs.tar.gz"
-info "Server rootfs build passed minimal QA"
+info "${VARIANT} rootfs build passed minimal QA"

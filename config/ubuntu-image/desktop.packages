@@ -1,0 +1,49 @@
+# Ubuntu GNOME/Wayland desktop additions to the Server product seed.
+# Keep UCM2 and board-specific WirePlumber policy in the later audio feature.
+gdm3
+ubuntu-session
+gnome-shell
+gnome-control-center
+gnome-settings-daemon
+nautilus
+gnome-terminal
+gnome-keyring
+dbus-user-session
+network-manager
+network-manager-gnome
+xdg-desktop-portal-gnome
+pipewire
+pipewire-pulse
+wireplumber
+xwayland
+libgl1-mesa-dri
+fonts-noto-core
+fonts-noto-cjk
+yaru-theme-gtk
+yaru-theme-icon
+
+# Hardware graphics and release acceptance.  Mesa's PanVK ICD is kept beside
+# the vendor EGL/GLES stack so Vulkan/WebGPU can name and exercise the Mali GPU.
+mesa-vulkan-drivers
+vulkan-tools
+glmark2-es2-wayland
+rt-tests
+
+# Chromium media-internals collection uses CDP from the target QA script.
+python3-websocket
+
+# Fcitx5 + Rime.  The latest rime-ice release is fetched and checksummed during
+# every desktop overlay assembly; these packages provide the runtime engine.
+fcitx5
+fcitx5-rime
+fcitx5-frontend-gtk3
+fcitx5-frontend-gtk4
+im-config
+dconf-cli
+xdotool
+ydotool
+
+# Bluetooth desktop management and PipeWire Bluetooth transport.
+bluez
+blueman
+libspa-0.2-bluetooth

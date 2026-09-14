@@ -9,7 +9,7 @@ RELEASE-GATES.md。
 ## GPU、Chromium 与中文输入
 
 GNOME 与 XFCE 的桌面配置分别见 GNOME.md、XFCE.md。
-浏览器硬件视频解码和真实视频验证见 Chromium MPP，
+浏览器硬件视频解码和真实视频验证见 [Chromium MPP](CHROMIUM-MPP-QA.md)，
 WebGPU/Vulkan 后端、硬件证明及限制见 WEBGPU-VULKAN-QA.md。
 中文输入、引擎和词库配置见 RIME-FCITX5-LATEST.md。
 
