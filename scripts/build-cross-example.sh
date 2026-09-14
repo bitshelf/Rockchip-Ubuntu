@@ -8,9 +8,10 @@ ACTION=build
 
 usage() {
     cat <<'EOF'
-usage: scripts/build-cross-example.sh [--print-plan] <libdrm>
+usage: scripts/build-cross-example.sh [--print-plan] <libdrm|chromium>
 
-Build patched libdrm ARM64 Debian packages.
+Build and package an ARM64 example on an x86_64 Docker host. libdrm and
+Chromium produce Ubuntu ARM64 DEBs.
 EOF
 }
 
@@ -25,11 +26,14 @@ example="${1:-}"
 (( $# == 1 )) || { usage >&2; exit 2; }
 case "$example" in
     libdrm) source_package=libdrm; package_format=deb ;;
+    chromium) source_package=chromium; package_format=deb ;;
     *) usage >&2; exit 2 ;;
 esac
 
 declare -A CALLER_ENV=()
-for env_name in CROSS_BUILD_JOBS; do
+for env_name in CHROMIUM_SOURCE_DIR CHROMIUM_DEPOT_TOOLS_DIR \
+    CHROMIUM_VERSION CHROMIUM_EXTRA_GN_ARGS \
+    CROSS_BUILD_JOBS; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -77,6 +81,7 @@ if ! "${docker_cmd[@]}" image inspect "$base_image" >/dev/null 2>&1; then
 fi
 install -d -m 2775 "$output_root"
 
+if [[ "$example" != chromium ]]; then
     example_image="ubuntu-cross-${example}:${base_tag//[^A-Za-z0-9_.-]/-}"
     info "Prepare ${example} Debian package image"
     "${docker_cmd[@]}" build --network host \
@@ -92,3 +97,31 @@ install -d -m 2775 "$output_root"
         --volume "${output_root}:/out" \
         "$example_image"
     exit 0
+fi
+
+source_dir="${CHROMIUM_SOURCE_DIR:-}"
+depot_tools_dir="${CHROMIUM_DEPOT_TOOLS_DIR:-}"
+version="${CHROMIUM_VERSION:-}"
+[[ "$source_dir" == /* && -f "${source_dir}/BUILD.gn" ]] ||
+    die "CHROMIUM_SOURCE_DIR must be an absolute Chromium src checkout"
+[[ "$(basename "$source_dir")" == src ]] ||
+    die "CHROMIUM_SOURCE_DIR basename must be src"
+[[ "$depot_tools_dir" == /* && -x "${depot_tools_dir}/gclient" ]] ||
+    die "CHROMIUM_DEPOT_TOOLS_DIR must be an absolute depot_tools checkout"
+[[ -n "$version" ]] || die "CHROMIUM_VERSION is required"
+
+info "Cross-build Chromium ARM64 payload"
+"${docker_cmd[@]}" run --rm --init --network host \
+    --env "BUILD_JOBS=${jobs}" \
+    --env "CHROMIUM_VERSION=${version}" \
+    --env "HOST_UID=$(id -u)" --env "HOST_GID=$(id -g)" \
+    --env "CHROMIUM_EXTRA_GN_ARGS=${CHROMIUM_EXTRA_GN_ARGS:-}" \
+    --env "CHROMIUM_PATCH_DIR=${CHROMIUM_PATCH_DIR:-}" \
+    --volume "${PROJECT_DIR}:/workspace:ro" \
+    --volume "$(dirname "$source_dir"):/chromium" \
+    --volume "${depot_tools_dir}:/depot_tools:ro" \
+    --volume "${output_root}:/out" \
+    --entrypoint /workspace/package/chromium/build-in-container.sh \
+    "$base_image"
+CROSS_OUTPUT_DIR="$output_root" CHROMIUM_VERSION="$version" \
+    "${PROJECT_DIR}/package/chromium/pack-deb.sh"

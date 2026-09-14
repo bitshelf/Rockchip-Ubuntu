@@ -9,6 +9,8 @@ usage: ./build.sh server [--check]
 
   server          build the Ubuntu 26 Server ARM64 rootfs
   server --check  validate configuration and host prerequisites only
+  desktop         build the Ubuntu 26 GNOME ARM64 rootfs
+  desktop --check validate GNOME configuration and host prerequisites only
   bootfs          build an independent ext4 boot filesystem
   bootfs --check  validate an existing bootfs image without mounting it
   overlay-root          build EROFS lower, userdata and OverlayFS initramfs
@@ -45,6 +47,10 @@ case "${1:-}" in
     server)
         shift
         exec "${PROJECT_DIR}/scripts/build-server.sh" "$@"
+        ;;
+    desktop)
+        shift
+        exec "${PROJECT_DIR}/scripts/build-server.sh" --variant desktop "$@"
         ;;
     bootfs)
         shift
