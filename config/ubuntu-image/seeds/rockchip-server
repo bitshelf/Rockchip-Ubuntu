@@ -39,7 +39,6 @@ Task-Seeds: minimal
  * e2fsprogs
  * lvm2
  * mdadm
- * multipath-tools
  * open-iscsi
  * xfsprogs
 

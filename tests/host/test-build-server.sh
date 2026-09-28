@@ -56,6 +56,19 @@ grep -Fq -- '--resume' "$BUILD_SCRIPT" ||
     fail "ubuntu-image state machine is not resumed after applying APT policy"
 grep -Fq 'openssh-server' "$DEFINITION" ||
     fail "Server SSH package is missing"
+grep -Fq 'network-config: |' "$DEFINITION" ||
+    fail "Server NoCloud wired network policy is missing"
+grep -Fq 'match: {name: "e*"}' "$DEFINITION" ||
+    fail "Server wired network policy does not select physical Ethernet"
+for required in iproute2 iputils-ping netplan.io systemd-resolved \
+        systemd-timesyncd; do
+    grep -Fq -- "- {name: ${required}}" "$DEFINITION" ||
+        fail "Server network package is missing from the image definition: ${required}"
+done
+grep -Fq 'Server rootfs manifest does not contain ${required}' "$BUILD_SCRIPT" ||
+    fail "Server build does not validate its installed network package manifest"
+! grep -Fq ' * multipath-tools' "$seed" ||
+    fail "Server seed enables unsupported multipath-tools"
 grep -Fq -- '- {name: adbd}' "$DEFINITION" ||
     fail "ADB daemon is missing from the rootfs definition"
 grep -Fq 'device-tree-compiler' "$DEFINITION" ||

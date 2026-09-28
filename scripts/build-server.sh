@@ -328,6 +328,16 @@ grep -q '^openssh-server[[:space:]]' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" 
     die "rootfs manifest does not contain openssh-server"
 grep -q '^adbd[[:space:]]' "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
     die "rootfs manifest does not contain adbd"
+if [[ "$VARIANT" == server ]]; then
+    for required in iproute2 iputils-ping netplan.io systemd-resolved \
+            systemd-timesyncd; do
+        grep -Eq "^${required}[[:space:]]" "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
+            die "Server rootfs manifest does not contain ${required}"
+    done
+    ! grep -Eq '^multipath-tools[[:space:]]' \
+        "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest" ||
+        die "Server rootfs unexpectedly contains multipath-tools"
+fi
 "${SCRIPT_DIR}/check-desktop-manifest.sh" "$VARIANT" "${IMAGES_DIR}/${IMAGE_BASENAME}.manifest"
 
 for forbidden in linux-firmware linux-firmware-raspi unattended-upgrades \
@@ -347,9 +357,10 @@ jq -n \
     --arg source_tree_sha256 "$source_tree_sha256" \
     '{schema: $schema, result: $result, variant: $variant, image: $image, sha256: $sha256,
       source_tree_sha256: $source_tree_sha256,
-      checks: ["rootfs.os-release", "rootfs.dpkg-status", "rootfs.apt-mirror",
+      checks: (["rootfs.os-release", "rootfs.dpkg-status", "rootfs.apt-mirror",
                "rootfs.firstboot-no-preset-account", "package.openssh-server", "package.adbd",
-               "packages.forbidden-absent", "packages.variant-boundary"]}' \
+               "packages.forbidden-absent", "packages.variant-boundary"] +
+      (if $variant == "server" then ["package.server-network-stack"] else [] end))}' \
     >"${IMAGES_DIR}/${IMAGE_BASENAME}.qa.json"
 chown "${SUDO_UID:-0}:${SUDO_GID:-0}" "${IMAGES_DIR}/${IMAGE_BASENAME}."*
 

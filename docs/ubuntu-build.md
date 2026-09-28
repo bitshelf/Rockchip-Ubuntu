@@ -18,6 +18,13 @@ Canonical seed 元数据仍从官方只读站点获取，并缓存到 `BUILD_OUT
 `unattended-upgrades`、`ubuntu-release-upgrader-core`、Thunderbird 和 LibreOffice
 不会先安装再卸载；manifest 门禁会阻止这些包进入发布产物。
 
+Server 的 cloud-init network seed 为物理有线接口启用 DHCP。生成 OverlayFS
+镜像时，若 seed 选择 `networkd`，会在镜像中持久启用
+`systemd-networkd.service`，使全新 userdata 的第一次启动也能获取地址。
+仅依靠 Netplan generator 的运行时依赖会漏掉首次启动，因为此时 cloud-init
+尚未写入 `/etc/netplan`。首启验收必须使用新的 userdata，不能以第二次启动
+联网代替。交付镜像不预置账户密码，由 firstboot 引导客户建号。
+
 ## 构建
 
 先使用 `scripts/setup-build-host.sh` 准备非容器化 Debian/Ubuntu 主机，再执行：
@@ -66,3 +73,19 @@ Server tarball 同时携带 `initramfs-tools` 和 `e2fsprogs`，供后续
 
 镜像不预置账户和密码。板级镜像由 firstboot 引导客户创建管理员账户，
 设置一次密码后正常使用；客户量产定制与回滚见 [UBUNTU-FIRSTBOOT.md](UBUNTU-FIRSTBOOT.md)。
+
+## 有线网络
+
+NoCloud 显式提供 Netplan v2 配置，匹配标准有线接口 `e*`（`eth*`、`en*`），
+启用 DHCP，未接网线的接口不阻塞启动。它不按某台设备的 MAC 地址或 `end1`
+编号绑定，也不会让 cloud-init 回退选中 Rockchip 的虚拟 `dummy0`。
+特殊接口命名由产品定制覆盖该 network-config。
+
+关闭 APT recommends 后，germinate 将包提升到 minimal 并不保证这些包最终被安装。
+因此 netplan、resolved、timesyncd 和网络诊断工具显式列入 extra-packages，并在
+最终 manifest 中检查。旧镜像只修 DHCP 配置仍可能缺 DNS 服务；必须使用本次
+重建产物验收。默认不安装 multipath-tools：本板无多路径存储，该服务会因内核
+不支持而失败；有 SAN 需求的产品应同时集成对应内核能力与软件包。
+
+目标板接入有 DHCP、DNS 的网络后运行 `tests/target/test-network.sh`，并在重启后
+重复执行，保存地址、路由、DNS 解析与无代理 HTTPS 请求结果。
