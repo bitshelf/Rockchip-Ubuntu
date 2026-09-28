@@ -23,6 +23,16 @@ customization:
     meta-data: |
       instance-id: ubuntu-resolute-server-arm64
       local-hostname: ubuntu
+    # Explicit wired policy avoids cloud-init selecting the vendor dummy0.
+    network-config: |
+      version: 2
+      renderer: networkd
+      ethernets:
+        wired:
+          match: {name: "e*"}
+          dhcp4: true
+          dhcp6: true
+          optional: true
     user-data: |
       #cloud-config
       users: []
@@ -34,6 +44,7 @@ customization:
   # product policy must be migrated in its own feature.
   extra-snaps: [{name: snapd}]
   extra-packages:
+    - {name: alsa-ucm-conf}
     - {name: adbd}
     - {name: bzip2}
     - {name: ca-certificates}
@@ -53,6 +64,13 @@ customization:
     - {name: libxcb-present0}
     - {name: libxcb-xfixes0}
     - {name: libxcb1}
+    # germinate can promote seed entries into minimal; keep the network
+    # stack explicit when APT recommendations are disabled.
+    - {name: iproute2}
+    - {name: iputils-ping}
+    - {name: netplan.io}
+    - {name: systemd-resolved}
+    - {name: systemd-timesyncd}
     - {name: openssh-server}
     - {name: sudo}
     - {name: udev}
