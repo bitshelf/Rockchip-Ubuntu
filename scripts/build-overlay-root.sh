@@ -48,7 +48,8 @@ esac
 declare -A CALLER_ENV=()
 for env_name in ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
     EROFS_ROOTFS_IMAGE USERDATA_IMAGE USERDATA_SIZE_MB BOOTFS_OUTPUT \
-    BOOTFS_CONFIG BOOTFS_TEMPLATE UPDATE_ENGINE_PACKAGE_DIR UPDATE_ENGINE_DEB; do
+    BOOTFS_CONFIG BOOTFS_TEMPLATE UPDATE_ENGINE_PACKAGE_DIR UPDATE_ENGINE_DEB \
+    RIME_ICE_URL RIME_ICE_ARCHIVE RIME_ICE_RESOLVED_URL; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -191,6 +192,7 @@ if [[ "$EUID" -ne 0 ]]; then
         --preserve-env=SOC_MODEL \
         --preserve-env=USERDATA_IMAGE \
         --preserve-env=USERDATA_SIZE_MB \
+        --preserve-env=RIME_ICE_URL,RIME_ICE_ARCHIVE,RIME_ICE_RESOLVED_URL \
         --preserve-env=ENABLE_CONSOLE_FIRSTBOOT,FIRSTBOOT_PROFILE \
         "$0" "$@"
 fi
@@ -280,6 +282,9 @@ fi
 "${SCRIPT_DIR}/install-rga.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-mpp.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-local-debs.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
+if [[ -x "$rootfs/usr/bin/gnome-shell" ]]; then
+    "${SCRIPT_DIR}/install-fcitx5-customization.sh" "$rootfs"
+fi
 
 module_source="${PLATFORM_ASSET_DIR}/modules/lib/modules/${kernel_release}"
 firstboot_args=("$rootfs" --profile "${FIRSTBOOT_PROFILE:-server}")

@@ -1,0 +1,28 @@
+# Fcitx5 session profile seeded by the Ubuntu image build (overlay/
+# desktop-common).  Ships the US keyboard plus Rime (雾凇拼音, data
+# deployed into ~/.local/share/fcitx5/rime by scripts/install-rime-ice.py)
+# in the default group.  Ctrl+Space toggles Fcitx5; holding Control and
+# pressing Space again enumerates the input methods.
+
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM=keyboard-us
+
+[Groups/0/Items/0]
+# Name
+Name=keyboard-us
+# Layout
+Layout=
+
+[Groups/0/Items/1]
+# Name
+Name=rime
+# Layout
+Layout=
+
+[GroupOrder]
+0=Default
