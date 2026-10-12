@@ -1,0 +1,17 @@
+diff --git a/arch/arm64/configs/myd_jr3576_ext.config b/arch/arm64/configs/myd_jr3576_ext.config
+index 7fbda6d64ab5..db8749a8025b 100644
+--- a/arch/arm64/configs/myd_jr3576_ext.config
++++ b/arch/arm64/configs/myd_jr3576_ext.config
+@@ -31,6 +31,12 @@ CONFIG_NF_TABLES_BRIDGE=y
+ CONFIG_NF_TABLES_INET=y
+ CONFIG_NF_TABLES_NETDEV=y
+ CONFIG_OVERLAY_FS=y
++# Ubuntu immutable rootfs: built in for mounting before switch_root.
++CONFIG_EROFS_FS=y
++CONFIG_EROFS_FS_XATTR=y
++CONFIG_EROFS_FS_POSIX_ACL=y
++CONFIG_EROFS_FS_SECURITY=y
++# CONFIG_EROFS_FS_ZIP is not set
+ CONFIG_PANIC_TIMEOUT=3
+ CONFIG_THERMAL_EMULATION=y
+ CONFIG_TOUCHSCREEN_GT9XX=y
