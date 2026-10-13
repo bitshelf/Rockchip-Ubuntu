@@ -19,33 +19,13 @@ GNOME RT 产品最后合并 `rk3576-desktop-rt.config`，解析后必须确认
 目标运行 `tests/target/test-rt-cyclictest.sh`。测试绑定 CPU0、SCHED_FIFO 99、
 60 秒、50 us histogram 上限，并同时要求最大延迟小于 50 us 且 overflow 为 0，成功标记为 `CYCLICTEST_RT_OK`。验收日志必须保存完整 cyclictest 输出、`uname -a` 和 `/proc/version`。
 
-2026-09-06 目标实测（20 秒快速轮次）最大延迟 2 us、overflow 0，输出保存在 `artifacts/acceptance-20260905/cyclictest-rt-20260906.log`；正式 promotion 仍应使用默认 60 秒或更长 soak 时长。
+## RK3576 桌面 CPU7 隔离配置
 
-## JR3576 GNOME CPU7 隔离配置
+在 `rk3576-desktop-rt.config` 后合并 `rk3576-desktop-rt-isolated.config`，
+启用 NO_HZ_FULL、RCU offload 和 CPU isolation。CPU 编号与启动参数必须来自
+具体硬件的 bootfs policy；不同 SoC 不继承其他目标的 CPU 拓扑或测试结果。
+同时核对 SDK `/chosen/bootargs` 与 extlinux 参数，防止后者被覆盖。
 
-2026-10-13 的 GNOME RT 常规配置测试在 CPU7 上运行 60 秒，最大延迟
-63 us、22 次 histogram overflow，未达到 50 us 门槛；旧批次通过结果不能
-覆盖本轮失败。独立候选在 `rk3576-desktop-rt.config` 后合并
-`rk3576-desktop-rt-isolated.config`，保留 PREEMPT_RT/HZ1000，并启用
-NO_HZ_FULL、RCU offload 和 CPU isolation。解析配置与独立编译已通过。
-
-配套 bootfs policy 为 `artifacts/bootfs.conf`，固定
-CPU7 用于实时任务、CPU0–6 用于桌面和普通 IRQ。必须同时加入
-`config/dts/optional/rk3576-rt-isolation.dtso`：它保留串口参数，去掉
-SDK `/chosen/bootargs` 的 trailing expedited RCU/`rcu_nocbs=all`，
-避免覆盖 extlinux 的显式 `rcu_nocbs=7 rcupdate.rcu_expedited=0`。
-这是专用的工业 RT 配置，会减少普通桌面可用的 CPU 调度范围；没有静默
-调整验收阈值。
-
-实机冷启动已确认内核 `6.1.141-rt52-rt-isolated-jr3576`、
-`isolated=7`、`nohz_full=7`、`rcu_expedited=0`。60 秒测试在浏览器视频
-复测同时运行时最大延迟 117 us、overflow 110，失败；随后独立轮次
-（期间执行短暂 ALSA 播放/录音诊断）最大延迟 45 us、overflow 0，通过。
-因此隔离配置尚未通过并发负载验收，不能以第二轮结果覆盖第一轮失败。
-原始日志分别为 SDK 输出 `qa/rt-isolated-idle.log`（历史文件名，实际与
-浏览器测试重叠）及 `qa/rt-isolated-standalone.log`，批次目录为
-`output/ubuntu-desktop-jr-20261013/`。正式并发 soak 仍需独立实测。
-
-同一 SDK 中 `TOUCHSCREEN_GOODIX` 与 `TOUCHSCREEN_GT9XX` 都注册为
-`Goodix-TS`；板级配置保留支持 `goodix,gt911` 的上游驱动，关闭 GT9XX。
-该配置变更需在下一次内核构建后确认重复注册日志消失。
+隔离配置会减少普通桌面可用的 CPU 调度范围。分别记录独立轮次与 GPU、视频、
+NPU 并发负载轮次的最大延迟和 overflow；独立轮次通过不能覆盖负载轮次失败。
+正式 promotion 还需完整时长 soak。运行记录保存在 Git 忽略的输出目录。

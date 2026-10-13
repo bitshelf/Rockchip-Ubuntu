@@ -33,75 +33,26 @@ fdtoverlay -i /boot/dtb/board.dtb -o /tmp/board-with-camera.dtb \
 
 ## 实机 QA
 
-### JR3576 的 CSI1 OV13855
+摄像头接线、I2C 地址和 media graph 由所选板级设备树提供。先核对
+`/proc/device-tree/model`、传感器 probe 和 `media-ctl -p`，显式选择实际 sensor。
+未接入的 sensor/虚拟管线由板级配置禁用；不在公共仓库提交一次性板级 overlay。
 
-JR3576 当前基础设备树 `kernel-6.1/arch/arm64/boot/dts/rockchip/myd-jr3576.dts`
-包含 `myd-jr3576-csi1-ov13855.dtsi`。该链路使用 I2C3 地址 0x36、四条
-MIPI lane、`csi2_dcphy0`、`rkcif_mipi_lvds`、`rkisp_vir0` 和 `rkvpss_vir0`。
-它与上面的 MYD-LR3576 CAM3 示例不是同一接口；JR3576 无需启用该示例 overlay。
-刷机后先核对 `/proc/device-tree/model`、传感器 subdev 名称、`media-ctl -p`
-拓扑和 `journalctl -b -k` 中的 OV13855 probe，再运行下面的实际取帧验收。
-只有 probe 成功、3A 无 AE/AWB 错误且真实镜头画面 30 帧通过，才标记 ISP 通过。
-SDK 附带的 OV13855 IQ 文件是否匹配新接入的模组仍需单独确认；不能只因文件名
-包含 OV13855 就视为匹配。
+`rkaiq_3A.service` 由 `rockchip-rkaiq-ready` 检查 sensor subdev 与同名前缀 IQ。
+缺少摄像头或匹配 IQ 时，ExecCondition 跳过服务。服务启动验收使用
+`tests/target/test-isp-3a-service.sh`，确认实体 subdev、IQ 加载、RKAIQ
+init/prepare，以及观察窗口内进程不退出或重启。该结果不代表画质通过。
+实际取帧与像素变化验收另用 `tests/target/test-isp-camera.sh`。
 
-镜头保持无遮挡、禁用 sensor test pattern 后运行：
+ISP39 bring-up IQ 可用 `package/isp/prepare-isp39-bringup-iq.py` 生成：
 
 ```bash
-sudo /usr/libexec/ubuntu-isp-camera-qa
+python3 package/isp/prepare-isp39-bringup-iq.py \
+  /path/to/sensor-iq.json /path/to/isp39-default.json \
+  /path/to/ignored-output/camera-iq/sensor_default_default.json
 ```
 
-当前示例的通过条件是实体 OV13855 subdev 存在、rkisp mainpath 可用、rkaiq 日志出现
-`rkisp_init engine succeed`，并实际取得 30 帧 NV12，文件大小、DQBUF 序号和像素
-变化均满足要求。成功输出 `RKAIQ_OK`、`RKISP_FRAME_OK` 和 `ISP_CAMERA_OK`。
-
-2026-09-03 的 MYD-LR3576 实测中，sensor ID `OV00d855`、4224×3136@30 输入和
-640×480 NV12 30 帧抓取均成功，文件为 13,824,000 字节。SDK 现有
-`isp3x/ov13855_CMK-OT2016-FV1_default.json` 能被加载并启动 rkisp，但 rkaiq
-v6.30.4/ISP39 报 AE/AWB schema 不兼容；它只能作为 bring-up 输入，不能标记为量产
-IQ。替换 sensor 时应由定制提交提供相应 overlay、IQ 和 QA sensor 匹配条件；量产
-前必须使用匹配模组的调校文件重新执行上述 QA 和画质验收。
-
-`rkaiq_3A.service` 保持启用，但启动前由 `rockchip-rkaiq-ready` 从 V4L2 sensor subdev
-名称解析 sensor，并确认 `/etc/iqfiles` 中存在同名前缀 IQ。没有启用摄像头 overlay
-或没有匹配 IQ 时，systemd 以 ExecCondition 未满足干净跳过，不会反复启动并崩溃。
-
-## JR3576 Server 单摄像头服务验收（2026-10-10）
-
-JR3576 CSI1 的 OV13855 已在 I2C3 0x36 读出芯片 ID `OV00d855`。
-`rk3576-disable-dsi.dtso` 保留共享 mipidcphy0 的基础状态，避免关闭 CSI PHY。
-使用 `artifacts/overlays/ov13855-only.dtso` 禁用未接入的
-CSI0/CSI2 OV5640 及其虚拟 ISP/VPSS 管线，避免 RKAIQ 初始化 FakeCamera。
-把该示例与 disable-DSI 一起放入本次 `DTS_OVERLAY_DIR`，不会默认启用示例。
-
-本次用户要求验证 3A 服务启动，暂不评价图像质量。旧 ISP3x OV13855 IQ
-缺少 ISP39 的算法参数，不能直接作为服务验收输入。
-`package/isp/prepare-isp39-bringup-iq.py` 将 SDK ISP39 默认参数与真实 OV13855
-增益/曝光寄存器换算、限值、延迟及模组元数据组合；生成文件及输入摘要保留在
-本次输出目录，经 `CAMERA_IQ_DIR` 安装为 `ov13855_default_default.json`。
-该文件只用于服务 bring-up，未验证画质、HDR 或量产调校。
-
-在 SDK 根目录生成（输出目录不得纳入 Git）：
-
-```bash
-uv run python ubuntu/package/isp/prepare-isp39-bringup-iq.py \
-  external/camera_engine_rkaiq/rkaiq/iqfiles/isp3x/ov13855_CMK-OT2016-FV1_default.json \
-  external/camera_engine_rkaiq/rkaiq/tools/iqUpdateRule/RK3576/awb_isp39_default.json \
-  output/ubuntu-server-jr-20261010/camera-iq/ov13855_default_default.json
-```
-
-输入与输出 SHA256 写入 `.json.provenance` 旁文件，避免被 IQ staging 的
-`*.json` 规则当成摄像头参数安装。
-
-供应的 RKAIQ 6.30.4 二进制使用旧版两缓冲区网格 ioctl；Linux 6.1 使用三缓冲区
-结构，旧请求返回 ENOTTY 后触发 CAC 空指针。兼容补丁与应用说明位于
-`docs/patches/kernel/`，保留新接口并单独支持旧请求。
-
-服务验收使用 `tests/target/test-isp-3a-service.sh`：确认实体 subdev、服务启用、
-RKAIQ init/prepare、IQ 加载及 30 秒内进程不退出或重启；线程创建失败也会失败。
-另行实际采集 NV12 帧，检查实时统计线程与服务 PID 稳定性。该范围不包含
-要求真实光学像素变化、匹配调校及画质的 `test-isp-camera.sh` 完整验收。
-
-Server 内核片段禁用 `CONFIG_RT_GROUP_SCHED`，使 cgroup v2 下 RKAIQ 的
-实时统计线程可运行（本 SDK 为 SCHED_RR，优先级 20）。最终板端结果和镜像
-摘要见 `docs/QA-SERVER-JR3576-20261010.md`。
+生成文件与 `.json.provenance` 保留在输出目录，通过 `CAMERA_IQ_DIR` 提供。
+这只用于服务 bring-up，不能替代匹配模组的正式 IQ 调校。
+RKAIQ 二进制与内核 mesh ioctl ABI 必须匹配，兼容补丁留在
+`docs/patches/kernel/`。cgroup v2 下实时统计线程还需禁用
+`CONFIG_RT_GROUP_SCHED`。所有运行记录与镜像摘要保留在 Git 忽略的输出目录。

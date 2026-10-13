@@ -114,6 +114,9 @@ done < <(find "${output}/payload" -type f -exec sh -c \
 {
     printf 'source.version=%s\nsource.kind=%s\n' "$version" "${CHROMIUM_SOURCE_KIND:-checkout}"
     [[ ! -f "$src/.source-info" ]] || cat "$src/.source-info"
-    sha256sum "$build_dir/args.gn" /workspace/package/chromium/patches/*.patch
+    sha256sum "$build_dir/args.gn"
+    while IFS= read -r patch_name; do
+        [[ -z "$patch_name" ]] || sha256sum "${CHROMIUM_PATCH_DIR:-/workspace/package/chromium/patches}/$patch_name"
+    done < "${CHROMIUM_PATCH_DIR:-/workspace/package/chromium/patches}/series"
 } > "$output/build-info"
 echo "CHROMIUM_ARM64_PAYLOAD_OK"
