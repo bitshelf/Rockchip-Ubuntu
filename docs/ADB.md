@@ -12,8 +12,21 @@ adb shell id
 adb shell 'readlink /proc/1/ns/net; ip -c a'
 ```
 
+交互操作请显式进入 Bash 并分配 PTY（把序列号换成当前板卡的 ADB 序列号）：
+
+```bash
+adb -s SERIAL shell -tt /bin/bash -i
+```
+
+无命令的 `adb shell` 可能进入 `/bin/sh`（Ubuntu 默认由 dash 提供），没有 Bash
+的 Tab 补全和 Readline 行编辑。通过嵌套 SSH 或管道启动 ADB 时，`-tt` 强制分配
+目标端 PTY，避免方向键、退格和控制键以 `^H` 等字符回显。若当前终端状态已紊乱，
+先退出 ADB shell，在开发主机执行 `stty sane; reset`，再重新进入。
+
 USB gadget 从 `/sys/class/udc/` 动态选择可用控制器，不绑定 SoC 寄存器地址。
 FunctionFS 描述符就绪后才绑定 UDC，避免 adbd 与 ConfigFS 的启动竞态。
+镜像创建 `/data/local/tmp -> /tmp`，兼容 adbd 为 shell 设置的 `TMPDIR`，
+使 `mktemp` 和常用的 ADB 临时文件路径可用。目标测试同时验证临时文件创建。
 
 ## 串口与 ADB 对照 QA
 
@@ -34,3 +47,6 @@ adb shell /path/to/tests/target/test-adb.sh
 ADB 只通过 USB FunctionFS 集成。功能不通过创建私有 network namespace 来隔离，
 也不通过将 daemon 降权来限制调试范围；产品若需要限制物理 USB 调试，应在单独的
 量产策略中整体关闭 ADB，而不是交付一个无法完成板级诊断的半权限 shell。
+
+比较前将 valid_lft/preferred_lft 归一化，保留接口、地址、颜色等实际内容；
+否则 DHCP 租期倒计时会让同一 network namespace 的两次正常读取产生不同哈希。
