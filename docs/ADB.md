@@ -25,6 +25,10 @@ adb -s SERIAL shell -tt /bin/bash -i
 
 USB gadget 从 `/sys/class/udc/` 动态选择可用控制器，不绑定 SoC 寄存器地址。
 FunctionFS 描述符就绪后才绑定 UDC，避免 adbd 与 ConfigFS 的启动竞态。
+绑定期间将所选控制器的 runtime-PM 策略设为 `on`，避免控制器休眠导致
+USB 调试连接无法枚举。原策略保存在 `/run/rk-adbd-runtime-pm/`，解绑或
+绑定失败时恢复；没有该电源接口的控制器仍可使用。启用 ADB 期间的空闲功耗
+可能增加，关闭 ADB 会恢复原策略。解绑向 ConfigFS 写入换行，确保触发解绑操作。
 镜像创建 `/data/local/tmp -> /tmp`，兼容 adbd 为 shell 设置的 `TMPDIR`，
 使 `mktemp` 和常用的 ADB 临时文件路径可用。目标测试同时验证临时文件创建。
 
