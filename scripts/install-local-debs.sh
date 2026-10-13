@@ -18,6 +18,26 @@ declare -p LOCAL_DEB_INSTALL_PURPOSES LOCAL_DEB_HOLD_PURPOSES \
     LOCAL_DEB_DISABLE_SERVICES LOCAL_DEB_REQUIRED_ENTRIES >/dev/null 2>&1 ||
     die "incomplete local DEB install config"
 
+for optional_array in LOCAL_DEB_DESKTOP_INSTALL_PURPOSES \
+        LOCAL_DEB_DESKTOP_OPTIONAL_INSTALL_PURPOSES \
+        LOCAL_DEB_DESKTOP_HOLD_PURPOSES LOCAL_DEB_DESKTOP_FILE_ENTRIES \
+        LOCAL_DEB_DESKTOP_REQUIRED_ENTRIES; do
+    declare -p "$optional_array" >/dev/null 2>&1 || declare -a "$optional_array=()"
+done
+if [[ -x "$rootfs/usr/bin/gnome-shell" ]]; then
+    for purpose in "${LOCAL_DEB_DESKTOP_OPTIONAL_INSTALL_PURPOSES[@]}"; do
+        if awk -F '\t' -v purpose="$purpose" '$6 == purpose { found=1 } END { exit !found }' \
+            "$asset_dir/local-deb-manifest.tsv"; then
+            LOCAL_DEB_DESKTOP_INSTALL_PURPOSES+=("$purpose")
+            LOCAL_DEB_DESKTOP_HOLD_PURPOSES+=("$purpose")
+        fi
+    done
+    LOCAL_DEB_INSTALL_PURPOSES+=("${LOCAL_DEB_DESKTOP_INSTALL_PURPOSES[@]}")
+    LOCAL_DEB_HOLD_PURPOSES+=("${LOCAL_DEB_DESKTOP_HOLD_PURPOSES[@]}")
+    LOCAL_DEB_FILE_ENTRIES+=("${LOCAL_DEB_DESKTOP_FILE_ENTRIES[@]}")
+    LOCAL_DEB_REQUIRED_ENTRIES+=("${LOCAL_DEB_DESKTOP_REQUIRED_ENTRIES[@]}")
+fi
+
 declare -a temporary_debs=() packages=() hold_packages=()
 cleanup() {
     local path
@@ -69,6 +89,7 @@ for entry in "${LOCAL_DEB_REQUIRED_ENTRIES[@]}"; do
     case "$kind" in
         file) [[ -s "$rootfs$path" ]] || die "required installed file is missing: $path" ;;
         glob) matches=("$rootfs"$path); (( ${#matches[@]} > 0 )) || die "required installed glob is empty: $path" ;;
+        executable) chroot "$rootfs" test -x "$path" || die "required installed executable is missing: $path" ;;
         *) die "unknown required entry type: $kind" ;;
     esac
 done

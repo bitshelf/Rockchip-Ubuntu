@@ -1,0 +1,32 @@
+Subject: [PATCH] panvk: skip non-Mali render nodes before kmod initialization
+
+RKNPU exposes a DRM render node on RK3576. An incompatible node must
+return VK_ERROR_INCOMPATIBLE_DRIVER, allowing the Vulkan runtime to
+continue enumerating Mali. Preserve allocation failures for compatible
+drivers. No Vulkan capability or version is overridden.
+
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -81,6 +81,22 @@
+    if (fd < 0) {
+       return panvk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
+                           "failed to open device '%s'", path);
++   }
++
++   /* Non-Mali render nodes (for example Rockchip RKNPU) must not abort
++    * enumeration before a Panfrost device is visited. */
++   drmVersionPtr version = drmGetVersion(fd);
++   if (!version) {
++      close(fd);
++      return panvk_error(instance, VK_ERROR_INCOMPATIBLE_DRIVER);
++   }
++
++   bool compatible = !strcmp(version->name, "panfrost") ||
++                     !strcmp(version->name, "panthor");
++   drmFreeVersion(version);
++   if (!compatible) {
++      close(fd);
++      return VK_ERROR_INCOMPATIBLE_DRIVER;
+    }
+ 
+    uint32_t flags = PAN_KMOD_DEV_FLAG_OWNS_FD;

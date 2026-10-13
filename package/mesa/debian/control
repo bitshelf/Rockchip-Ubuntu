@@ -1,0 +1,14 @@
+Source: mesa-panvk-experimental
+Section: libs
+Priority: optional
+Maintainer: Ubuntu image CI <root@localhost>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://gitlab.freedesktop.org/mesa/mesa
+
+Package: mesa-panvk-experimental
+Architecture: arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Explicitly selected development PanVK Vulkan ICD
+ Installs a separate experimental PanVK driver without replacing Ubuntu Mesa.
+ Select its ICD and experimental driver switch explicitly for hardware QA.

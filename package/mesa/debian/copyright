@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Mesa PanVK
+Source: https://gitlab.freedesktop.org/mesa/mesa
+
+Files: *
+Copyright: Mesa contributors
+License: MIT
+ See the upstream license accompanying the verified native build input.
