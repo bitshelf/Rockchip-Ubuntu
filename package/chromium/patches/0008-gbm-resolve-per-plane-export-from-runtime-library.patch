@@ -1,0 +1,32 @@
+--- a/ui/gfx/linux/gbm_wrapper.cc
++++ b/ui/gfx/linux/gbm_wrapper.cc
+@@ -34,11 +34,6 @@
+ #include "base/strings/stringize_macros.h"
+ #endif
+ 
+-extern "C" {
+-int gbm_bo_get_fd_for_plane(struct gbm_bo* bo, int plane)
+-    __attribute__((weak_import));
+-}
+-
+ namespace ui {
+ namespace gbm_wrapper {
+ namespace {
+@@ -64,8 +59,15 @@
+   return base::ScopedFD(gbm_bo_get_plane_fd(bo, plane));
+ #else
+   // System linux gbm (or Mesa gbm) has fd per plane support
+-  if (gbm_bo_get_fd_for_plane) {
+-    int fd = gbm_bo_get_fd_for_plane(bo, static_cast<int>(plane));
++  // The build sysroot may predate this entry point. The executable's symbol
++  // version script can localize its unresolved weak reference, so resolve it
++  // from the loaded runtime library instead. This also lets split display /
++  // render drivers export through GBM rather than using the display DRM fd.
++  using GetFdForPlane = int (*)(gbm_bo*, int);
++  static const auto get_fd_for_plane = reinterpret_cast<GetFdForPlane>(
++      dlsym(RTLD_DEFAULT, "gbm_bo_get_fd_for_plane"));
++  if (get_fd_for_plane) {
++    int fd = get_fd_for_plane(bo, static_cast<int>(plane));
+     if (fd >= 0) {
+       return base::ScopedFD(fd);
+     }

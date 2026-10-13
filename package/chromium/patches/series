@@ -1,0 +1,11 @@
+0001-v4l2-route-device-operations-through-libv4l-rkmpp.patch
+0002-linux-arm-broker-rkmpp-and-panvk-resources.patch
+0003-query-decoder-configs-through-v4l2-device.patch
+0004-opt-in-vulkan-webgpu-readback-bridge.patch
+0005-linux-arm-mesa-resources-for-early-gpu-sandbox.patch
+0006-x11-connect-before-early-gpu-sandbox.patch
+0007-x11-share-gles-webgpu-images-and-egl-visuals.patch
+0008-gbm-resolve-per-plane-export-from-runtime-library.patch
+0009-x11-use-native-egl-window-config-for-angle-egl.patch
+0010-ozone-validate-video-import-without-requiring-allocation.patch
+0011-gbm-import-video-without-requiring-scanout-allocation.patch

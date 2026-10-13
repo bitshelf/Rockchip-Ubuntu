@@ -1,0 +1,16 @@
+--- a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+@@ -271,7 +271,12 @@
+     return false;
+   }
+   auto* factory = ui::OzonePlatform::GetInstance()->GetSurfaceFactoryOzone();
+-  if (!factory->CanCreateNativePixmapForFormat(format)) {
++  // Decoder-owned DMA-BUFs can be importable even when the display GBM
++  // allocator cannot create that format (for example NV12 on split KMS/GPU
++  // devices). Imported handles are validated by CreateNativePixmapFromHandle
++  // and the selected GL/Vulkan import path below.
++  if (gmb_type == gfx::EMPTY_BUFFER &&
++      !factory->CanCreateNativePixmapForFormat(format)) {
+     return false;
+   }
+ 
