@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/dts-v1/;
+/plugin/;
+
+/* RK3576 HDMI/DP desktop with DSI disabled: keep Esmart0/1 as primary,
+ * reserve Esmart2 for VP0 and Esmart3 for VP1 hardware cursors.
+ * Physical IDs match include/dt-bindings/display/rockchip_vop.h.
+ * Do not enable with a VP2/DSI plane assignment using these windows.
+ */
+&vp0 {
+    cursor-win-id = <8>; /* ROCKCHIP_VOP2_ESMART2 */
+};
+
+&vp1 {
+    cursor-win-id = <9>; /* ROCKCHIP_VOP2_ESMART3 */
+};

@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+if [[ "${GPU_STACK:-vendor}" == panfrost ]]; then
+    [[ "$(dpkg-query -W -f='${db:Status-Status}' libegl-mesa0)" == installed ]]
+    exec env GPU_STACK=panfrost python3 "${SCRIPT_DIR}/headless-egl.py"
+fi
 [[ "$(id -u)" -eq 0 ]] || { echo "FAIL: run as root" >&2; exit 1; }
 mapfile -t packages < <(
     dpkg-query -W -f='${binary:Package}\t${db:Status-Status}\n' 'libmali-*' \
