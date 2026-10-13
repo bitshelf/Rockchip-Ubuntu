@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -132,7 +133,7 @@ if [[ "$MODE" == check ]]; then
 fi
 
 if [[ "$EUID" -ne 0 ]]; then
-    exec sudo --preserve-env=BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
+    exec sudo --preserve-env=PYTHONDONTWRITEBYTECODE,BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
         "$0" "${BUILD_ARGS[@]}"
 fi
 

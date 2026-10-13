@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# CI invokes mount tests as root; do not leave root-owned Python caches.
+export PYTHONDONTWRITEBYTECODE=1
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 while IFS= read -r -d '' script; do
