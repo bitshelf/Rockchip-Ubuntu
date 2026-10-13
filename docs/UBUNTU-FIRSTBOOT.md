@@ -24,3 +24,9 @@ Desktop 可选择 desktop 或 desktop-xfce profile，自动登录默认关闭。
 console/getty 所有权和 EOF 后密码输入。`tests/target/test-firstboot.sh default`
 检查待初始化镜像；完成建号后执行 `completed`，再重启确认不再次提示。
 中断初始化时 pending 保留，下次启动继续。硬件验证结果单独保存，不以源码测试代替。
+
+首启引擎的控制台提示统一为英文，包括管理员用户名、非法用户名、重复用户、
+密码设置失败、中断恢复和完成提示；账户规则与 root 锁定行为不变。
+板端验收须通过实际控制台或伪终端完成 `Enter administrator username:` 和两次
+密码提示，再检查 SSH 登录与重启后的账户持久化。结果和测试凭据分别保存在
+Git 忽略的输出与私有控制目录中，不预置到发布镜像。

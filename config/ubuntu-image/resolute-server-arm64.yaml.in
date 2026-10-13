@@ -44,6 +44,7 @@ customization:
   # product policy must be migrated in its own feature.
   extra-snaps: [{name: snapd}]
   extra-packages:
+    - {name: bash}
     - {name: alsa-ucm-conf}
     - {name: adbd}
     - {name: bzip2}

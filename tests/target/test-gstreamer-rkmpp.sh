@@ -17,7 +17,7 @@ done
     echo "ERROR: /dev/mpp_service is unavailable" >&2
     exit 1
 }
-for element in mpph264enc mppvideodec h264parse; do
+for element in mpph264enc mppvideodec h264parse identity; do
     gst-inspect-1.0 "$element" >/dev/null || {
         echo "ERROR: missing GStreamer element: $element" >&2
         exit 1
@@ -37,6 +37,7 @@ if ! timeout 120 gst-launch-1.0 -e -v \
         ! mpph264enc \
         ! h264parse \
         ! mppvideodec \
+        ! identity name=decoded silent=false \
         ! fakesink sync=false 2>&1 | tee "$log"; then
     echo "ERROR: Rockchip GStreamer hardware pipeline failed" >&2
     exit 1
@@ -50,4 +51,9 @@ grep -Eiq 'error|failed|not-negotiated' "$log" && {
     exit 1
 }
 
-printf 'GSTREAMER_RKMPP_OK frames=%s encoder=mpph264enc decoder=mppvideodec\n' "$frames"
+decoded_frames="$(grep -c 'GstIdentity:decoded: last-message = chain' "$log" || true)"
+[[ "$decoded_frames" -eq "$frames" ]] || {
+    echo "ERROR: expected $frames decoded buffers, got $decoded_frames" >&2
+    exit 1
+}
+printf 'GSTREAMER_RKMPP_OK frames=%s decoded=%s encoder=mpph264enc decoder=mppvideodec\n' "$frames" "$decoded_frames"

@@ -28,13 +28,15 @@ SOC_MODEL="<soc>" SDK_KERNEL_CONFIG="<kernel-build-config>" \
 ## 非 root 权限
 
 udev 按 RKNPU 驱动匹配 DRM render 节点，不依赖 `renderD129` 等动态编号；旧驱动的
-`/dev/rknpu` 也使用相同策略。节点归 `render` 组、权限 `0660` 并带 `uaccess`。
-`ubuntu-firstboot` 创建的客户账户默认加入 `render` 组。
+`/dev/rknpu` 也使用相同策略。render 节点归 `render` 组、权限 `0660` 并带
+`uaccess`。Rockchip runtime 还会访问同一 DRM 设备的 card 节点，因此 DRM 模式下
+的普通账户必须同时属于 `render` 和 `video`。Server 镜像由 firstboot 创建客户账户，
+不预置 `ubuntu` 账号或密码；使用实际创建的账户验收。
 
 ## 目标板验收
 
-使用普通账户直接运行；若由 root/自动化调用，脚本会选择 firstboot 客户账户或第一个
-有效普通账户，通过 `runuser` 执行全部推理：
+使用普通账户直接运行；若由 root/自动化调用，脚本会优先选择 firstboot 客户账户，
+否则选择第一个有效普通账户，通过 `runuser` 执行全部推理：
 
 ```bash
 /usr/libexec/ubuntu-rknpu-qa

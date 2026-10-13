@@ -17,7 +17,7 @@ grep -Fq 'v4l-utils|ubuntu-source|' "$PROJECT_DIR/config/local-debs/build.conf" 
     fail "patched v4l-utils build is missing"
 grep -Fq 'libv4l-rkmpp|debian-recipe|' "$PROJECT_DIR/config/local-debs/build.conf" ||
     fail "libv4l-rkmpp build is missing"
-[[ "$(find "$PROJECT_DIR/package/v4l-utils/patches" -type f -name '*.patch' | wc -l)" -eq 5 ]] ||
+[[ "$(find "$PROJECT_DIR/package/v4l-utils/patches" -type f -name '*.patch' | wc -l)" -eq 6 ]] ||
     fail "unexpected Resolute v4l-utils patch count"
 grep -Fq 'V4L2_RKMPP_OK' "$PROJECT_DIR/tests/target/test-v4l2.sh" ||
     fail "V4L2 MPP acceptance marker is missing"
