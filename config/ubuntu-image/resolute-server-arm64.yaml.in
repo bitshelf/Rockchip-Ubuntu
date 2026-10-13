@@ -72,6 +72,7 @@ customization:
     - {name: systemd-resolved}
     - {name: systemd-timesyncd}
     - {name: openssh-server}
+    - {name: rt-tests}
     - {name: sudo}
     - {name: udev}
     - {name: v4l-utils}
