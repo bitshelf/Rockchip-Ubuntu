@@ -1,0 +1,4 @@
+# RKNPU exposes DRM nodes for buffer allocation, not graphics rendering.
+SUBSYSTEM=="drm", DRIVERS=="rknpu|RKNPU", TAG+="mutter-device-ignore"
+# Match the driver, not an enumeration-dependent card/render node number.
+SUBSYSTEM=="drm", DRIVERS=="panfrost", TAG+="mutter-device-preferred-primary"

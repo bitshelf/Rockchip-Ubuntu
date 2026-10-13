@@ -232,7 +232,6 @@ if [[ "$VARIANT" == desktop ]]; then
     sed -i -e 's/name: ubuntu-server-arm64/name: ubuntu-desktop-arm64/' \
         -e 's/display-name: Ubuntu Server arm64/display-name: Ubuntu GNOME arm64/' \
         -e 's/ubuntu-26.04-server-arm64/ubuntu-26.04-desktop-arm64/g' \
-        -e 's/extra-snaps: \[{name: snapd}\]/extra-snaps: [{name: snapd}, {name: bare}, {name: core22}, {name: core24}, {name: gtk-common-themes, channel: latest\/stable}, {name: gnome-46-2404, channel: latest\/stable}, {name: mesa-2404, channel: latest\/stable}, {name: cups, channel: latest\/stable}, {name: chromium, channel: latest\/stable}]/' \
         -e "/^  extra-packages:/r $extra_packages" "$DEFINITION"
 fi
 
