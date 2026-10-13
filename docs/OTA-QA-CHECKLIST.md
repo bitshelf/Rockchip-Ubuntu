@@ -9,7 +9,7 @@
 | ⬜ | boot 分区升级 | `boot.img` 哈希、重启后的 kernel/DTB 版本 |
 | ⬜ | U-Boot 分区升级 | `uboot.img` 哈希、U-Boot 版本、冷启动日志 |
 | ⬜ | recovery 分区升级 | recovery 版本及进入/退出 recovery 日志 |
-| ⬜ | bootfs 独立升级 | extlinux、Image、DTB/DTBO 清单及重启结果 |
+| ⬜ | ext4 boot 文件系统升级 | 与 boot 分区为同一 payload；由 recovery 中的 updateEngine 更新 |
 | ⬜ | A/B 正常升级 | 当前 slot、目标 slot、切换后的版本 |
 | ⬜ | A/B 启动失败回滚 | bootcount/slot 元数据和回滚串口日志 |
 | ⬜ | 更新中断电恢复 | 断电点、恢复路径、最终分区哈希 |

@@ -80,4 +80,4 @@ sudo tests/target/test-update-engine.sh
 块设备 payload 写入前通过 `BLKGETSIZE64` 检查容量，过大时返回错误，避免写到
 分区末尾才失败。该检查针对单次块写入，不提供多分区事务或自动回滚。
 
-实机记录见 [2026-09-06 updateEngine 验收](QA-UPDATEENGINE-20260906.md)。
+实机记录与原始日志保存在 Git 忽略的输出目录，按镜像校验值关联验收批次。
