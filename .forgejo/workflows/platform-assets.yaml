@@ -14,11 +14,14 @@ jobs:
       SDK_KERNEL_CONFIG: ${{ vars.SDK_KERNEL_CONFIG }}
       SOC_MODEL: ${{ vars.SOC_MODEL }}
       ASSET_PROVIDER: forgejo
+      ASSET_UPLOAD_KIND: generic
+      ASSET_PACKAGE_NAME: ubuntu-platform-assets
       ASSET_REPOSITORY: ${{ github.repository }}
       ASSET_SERVER_URL: ${{ github.server_url }}
       ASSET_TAG: ${{ vars.PLATFORM_ASSET_RELEASE_TAG }}
       ASSET_TARGET_COMMIT: ${{ github.sha }}
       ASSET_TOKEN: ${{ secrets.PLATFORM_ASSET_RELEASE_TOKEN }}
+      PLATFORM_ASSET_DIR: ${{ github.workspace }}/artifacts/platform-assets/${{ vars.SOC_MODEL }}
       PLATFORM_ASSET_BUNDLE: ${{ github.workspace }}/artifacts/platform-assets-${{ vars.SOC_MODEL }}.tar.zst
 
     steps:
@@ -31,5 +34,5 @@ jobs:
       - name: Build immutable asset bundle
         run: ./scripts/pack-platform-assets.sh "$PLATFORM_ASSET_BUNDLE"
 
-      - name: Publish Forgejo release assets
+      - name: Publish Forgejo package assets
         run: ./scripts/publish-platform-assets.sh

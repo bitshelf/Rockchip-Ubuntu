@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -180,6 +181,7 @@ done
 
 if [[ "$EUID" -ne 0 ]]; then
     exec sudo \
+        --preserve-env=PYTHONDONTWRITEBYTECODE \
         --preserve-env=UPDATE_ENGINE_DEB \
         --preserve-env=UPDATE_ENGINE_PACKAGE_DIR \
         --preserve-env=BOOTFS_CONFIG \

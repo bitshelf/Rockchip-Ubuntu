@@ -1,45 +1,52 @@
-name: Ubuntu Server
+name: Ubuntu rootfs
 
 on:
   push:
+    branches: ['**']
   workflow_dispatch:
 
 jobs:
-  build-server:
+  build-rootfs:
     runs-on: ${{ vars.ARM64_RUNNER_LABEL || 'ubuntu-24.04-arm' }}
     timeout-minutes: 720
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [server, desktop]
     env:
-      BUILD_OUTPUT_DIR: ${{ github.workspace }}/build
-      SOC_MODEL: ${{ vars.SOC_MODEL }}
-      BOOTFS_BASE_DTB: ${{ vars.BOOTFS_BASE_DTB }}
-      PLATFORM_ASSET_BUNDLE_URL: ${{ vars.PLATFORM_ASSET_BUNDLE_URL }}
-      PLATFORM_ASSET_BUNDLE_SHA256: ${{ vars.PLATFORM_ASSET_BUNDLE_SHA256 }}
-      PLATFORM_ASSET_AUTH_HEADER: ${{ secrets.PLATFORM_ASSET_AUTH_HEADER }}
+      CLEAN_CI_WORK: yes
+      BUILD_OUTPUT_DIR: ${{ github.workspace }}/build/${{ matrix.variant }}
+      BUILD_INPUTS_URL: ${{ vars.BUILD_INPUTS_URL }}
+      BUILD_INPUTS_SHA256: ${{ vars.BUILD_INPUTS_SHA256 }}
+      BUILD_INPUTS_AUTH_HEADER: ${{ secrets.BUILD_INPUTS_AUTH_HEADER }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install native rootfs build prerequisites
+        run: |
+          sudo -n apt-get update
+          sudo -n apt-get install -y --no-install-recommends snapd distro-info-data ubuntu-keyring e2fsprogs erofs-utils initramfs-tools device-tree-compiler gdisk dosfstools rsync git curl wget jq zstd openssl dpkg-dev fakeroot file gzip kmod make gcc g++ libc6-dev libbz2-dev libcurl4-openssl-dev patch python3 util-linux libglib2.0-bin
+          sudo -n snap install ubuntu-image --classic
+
       - name: Source checks
-        run: ./scripts/check-source.sh
+        run: sudo -n unshare --mount --propagation private ./scripts/check-source.sh
 
-      - name: Fetch verified platform assets
-        run: ./scripts/fetch-platform-assets.sh
+      - name: Download verified artifacts directory
+        run: python3 scripts/build-inputs.py fetch --inputs "$RUNNER_TEMP/ubuntu-inputs-${{ github.run_id }}-${{ matrix.variant }}"
 
-      - name: Check build environment
-        run: ./build.sh server --check
+      - name: Build native ARM64 filesystem images
+        run: python3 scripts/build-inputs.py build --inputs "$RUNNER_TEMP/ubuntu-inputs-${{ github.run_id }}-${{ matrix.variant }}" --output "$BUILD_OUTPUT_DIR" --variant ${{ matrix.variant }}
 
-      - name: Build server rootfs
-        run: ./build.sh server
-
-      - name: Verify server rootfs artifacts
+      - name: Export verified filesystem artifacts
         id: rootfs-artifacts
-        run: ./scripts/export-rootfs-artifacts.sh
+        run: ROOTFS_VARIANT=${{ matrix.variant }} ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes ./scripts/export-rootfs-artifacts.sh
 
-      - name: Upload server rootfs
+      - name: Upload ARM64 filesystem artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.rootfs-artifacts.outputs.name }}-${{ github.run_id }}
-          path: ${{ steps.rootfs-artifacts.outputs.paths }}
+          name: ubuntu-${{ matrix.variant }}-${{ github.run_id }}
+          path: artifacts/${{ matrix.variant }}/
           if-no-files-found: error
-          compression-level: 0
+          compression-level: 1

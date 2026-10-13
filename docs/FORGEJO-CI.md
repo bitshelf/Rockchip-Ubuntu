@@ -41,6 +41,9 @@ Forgejo 只能构建已提交并推送的源码，不能看到开发目录中的
 开发时先在 ARM64 主机对当前工作区执行手工构建和最小 QA，审核后再
 创建功能提交并 push，由 CI 对该提交做第二次验证。
 
+rootfs 工作流只响应分支 push 和手动触发；附件发布与候选版本的 tag
+不重复启动整套 rootfs 构建。Forgejo 与 GitHub 使用相同规则。
+
 ```text
 修改 -> ARM64 手工构建 -> 最小 QA -> 审核 -> commit -> push -> Forgejo CI
 ```
