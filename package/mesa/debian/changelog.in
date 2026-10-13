@@ -1,0 +1,5 @@
+mesa-panvk-experimental (26.3.0~git76b9372c+rockchip.@SERIES@.1) @SERIES@; urgency=medium
+
+  * Package a separately selected development PanVK ICD with build provenance.
+
+ -- Ubuntu image CI <root@localhost>  Tue, 13 Oct 2026 00:00:00 +0000
