@@ -18,5 +18,5 @@ ALSA_CLI_OK cards=<n> playback=<n> capture=<n> controls=<n>
 ```
 
 这是非破坏性的基础 CLI 验收：不改变 mixer、不播放扬声器、不采集麦克风数据。
-声道映射、UCM profile、音量策略和真实播放/录音应在后续 audio UCM 功能提交中独立
-验收。
+声道映射、UCM profile、WirePlumber 会话和真实播放/录音见
+[AUDIO-GNOME-QA.md](AUDIO-GNOME-QA.md)。
