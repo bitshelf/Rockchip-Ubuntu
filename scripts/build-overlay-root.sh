@@ -299,7 +299,13 @@ fi
 if [[ "$GPU_STACK" == libmali ]]; then
     "${SCRIPT_DIR}/install-libmali.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 else
-    for mesa_package in libegl-mesa0 libgl1-mesa-dri mesa-vulkan-drivers; do
+    mesa_packages=(libegl-mesa0 libgl1-mesa-dri libgles2)
+    # Vulkan/WebGPU belongs to the desktop package set. A headless Server
+    # still uses Mesa EGL/DRI without requiring the desktop Vulkan ICD.
+    if [[ -x "$rootfs/usr/bin/gnome-shell" || -x "$rootfs/usr/bin/xfce4-session" ]]; then
+        mesa_packages+=(mesa-vulkan-drivers)
+    fi
+    for mesa_package in "${mesa_packages[@]}"; do
         # shellcheck disable=SC2016
         chroot "$rootfs" dpkg-query -W -f='${db:Status-Status}' "$mesa_package" |
             grep -Fxq installed || die "Panfrost Mesa package is missing: $mesa_package"
