@@ -5,6 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 initramfs_script="${PROJECT_DIR}/config/overlay-root/initramfs/scripts/init-bottom/overlay-root"
 initramfs_hook="${PROJECT_DIR}/config/overlay-root/initramfs/hooks/overlay-root"
 fstab="${PROJECT_DIR}/config/overlay-root/fstab"
+build_script="${PROJECT_DIR}/scripts/build-overlay-root.sh"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf -- "$tmp_dir"' EXIT
 
@@ -30,6 +31,11 @@ grep -Eq '^PARTLABEL=boot[[:space:]]+/boot[[:space:]]+ext4' "$fstab" ||
     fail "independent bootfs mount is missing"
 ! grep -Eq '^PARTLABEL=userdata[[:space:]]+' "$fstab" ||
     fail "fstab races initramfs for the userdata mount"
+for variable in BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB BOOTFS_SIZE_MB \
+        BOOTFS_LABEL BOOTFS_TIMEOUT BOOTFS_CMDLINE DTS_OVERLAY_DIR; do
+    grep -Fq -- "--preserve-env=${variable}" "$build_script" ||
+        fail "overlay-root sudo re-exec drops ${variable}"
+done
 
 # Model an interrupted ext4 upper: mark the filesystem dirty, run the same
 # preen policy used by initramfs, then grow it into a larger partition image.

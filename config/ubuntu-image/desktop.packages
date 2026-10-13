@@ -2,12 +2,16 @@
 # Keep UCM2 and board-specific WirePlumber policy in the later audio feature.
 gdm3
 ubuntu-session
+ubuntu-settings
+ubuntu-wallpapers
 gnome-shell
 gnome-control-center
 gnome-settings-daemon
 nautilus
 gnome-terminal
 gnome-keyring
+libpam-gnome-keyring
+at-spi2-core
 dbus-user-session
 network-manager
 network-manager-gnome
@@ -19,11 +23,12 @@ xwayland
 libgl1-mesa-dri
 fonts-noto-core
 fonts-noto-cjk
+fonts-ubuntu
 yaru-theme-gtk
 yaru-theme-icon
 
-# Hardware graphics and release acceptance.  Mesa's PanVK ICD is kept beside
-# the vendor EGL/GLES stack so Vulkan/WebGPU can name and exercise the Mali GPU.
+# Hardware graphics and release acceptance. The Panfrost product uses Mesa's
+# PanVK ICD; GPU_STACK selects the matching kernel and userspace installation.
 mesa-vulkan-drivers
 vulkan-tools
 glmark2-es2-wayland
@@ -36,6 +41,8 @@ python3-websocket
 # every desktop overlay assembly; these packages provide the runtime engine.
 fcitx5
 fcitx5-rime
+librime-bin
+librime-plugin-lua
 fcitx5-frontend-gtk3
 fcitx5-frontend-gtk4
 im-config

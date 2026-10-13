@@ -91,6 +91,11 @@ CROSS_BASE_TAG="<ubuntu-base-tag>" ./scripts/cross-build-env.sh --check
 完整配置、使用方式和版本迁移步骤见
 [CROSS-COMPILE.md](CROSS-COMPILE.md)。
 
+可执行的编译与打包示例：
+
+- [libdrm ARM64 DEB](CROSS-LIBDRM.md)
+- [Chromium ARM64 DEB](CROSS-CHROMIUM.md)
+
 ## Recovery OTA
 
 `updateEngine` 从 SDK 的干净源码提交构建为 ARM64 DEB，并在 EROFS 合成阶段安装。
@@ -110,6 +115,11 @@ Rockchip U-Boot 2017.09 的 extlinux 启动接入、FDT overlay 回移、RKIMG �
 版本移植说明见
 [UBOOT-EXTLINUX-FDTOVERLAYS.md](UBOOT-EXTLINUX-FDTOVERLAYS.md)。该功能
 只交付一个合并补丁，应用前必须对目标 U-Boot 执行 `git apply --check`。
+
+## GNOME 桌面
+
+按 Server → GNOME → XFCE 顺序移植。`./build.sh desktop` 构建 GNOME；
+配置、firstboot 账户策略与板端验收见 [GNOME.md](GNOME.md)。
 
 Server、GNOME 和 XFCE 的默认登录 shell 为 `/bin/bash`；首启管理员、root
 以及通过 `useradd`、`adduser` 新建的普通用户均采用 Bash。
