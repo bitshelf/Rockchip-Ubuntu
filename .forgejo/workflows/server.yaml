@@ -1,50 +1,48 @@
-name: Ubuntu Server
+name: Ubuntu rootfs
 
 on:
   push:
+    branches: ['**']
   workflow_dispatch:
 
 jobs:
-  build-server:
+  build-rootfs:
     runs-on: native-arm64
     timeout-minutes: 720
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [server, desktop]
+    env:
+      CLEAN_CI_WORK: yes
+      BUILD_OUTPUT_DIR: ${{ vars.BUILD_OUTPUT_DIR || '/var/lib/overlay-root/ubuntu-ci/build' }}/${{ matrix.variant }}
+      BUILD_INPUTS_URL: ${{ vars.BUILD_INPUTS_URL }}
+      BUILD_INPUTS_SHA256: ${{ vars.BUILD_INPUTS_SHA256 }}
+      BUILD_INPUTS_AUTH_HEADER: ${{ secrets.BUILD_INPUTS_AUTH_HEADER }}
 
     steps:
       - name: Checkout
         uses: https://data.forgejo.org/actions/checkout@v4
 
       - name: Source checks
-        run: ./scripts/check-source.sh
+        run: |
+          sudo -n install -d -m 1777 /tmp /var/tmp
+          sudo -n unshare --mount --propagation private ./scripts/check-source.sh
 
-      - name: Fetch published platform assets when configured
-        run: ./scripts/fetch-platform-assets.sh --if-configured
+      - name: Download verified artifacts directory
+        run: python3 scripts/build-inputs.py fetch --inputs "$RUNNER_TEMP/ubuntu-inputs-${{ github.run_id }}-${{ matrix.variant }}"
 
-      - name: Check build environment
-        run: ./build.sh server --check
+      - name: Build native ARM64 filesystem images
+        run: python3 scripts/build-inputs.py build --inputs "$RUNNER_TEMP/ubuntu-inputs-${{ github.run_id }}-${{ matrix.variant }}" --output "$BUILD_OUTPUT_DIR" --variant ${{ matrix.variant }}
 
-      - name: Check SDK platform assets
-        run: ./scripts/stage-sdk-assets.sh --check
-
-      - name: Check staged updateEngine source
-        run: ./build.sh update-engine --check
-
-      - name: Build updateEngine package
-        run: ./build.sh update-engine
-
-      - name: Build server rootfs
-        run: ./build.sh server
-
-      - name: Verify server rootfs artifacts
+      - name: Export verified filesystem artifacts
         id: rootfs-artifacts
-        run: ./scripts/export-rootfs-artifacts.sh
+        run: ROOTFS_VARIANT=${{ matrix.variant }} ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes ./scripts/export-rootfs-artifacts.sh
 
-      - name: Upload server rootfs
+      - name: Upload ARM64 filesystem artifacts
         uses: https://data.forgejo.org/forgejo/upload-artifact@v4
         with:
-          name: ${{ steps.rootfs-artifacts.outputs.name }}-${{ github.run_id }}
-          path: ${{ steps.rootfs-artifacts.outputs.paths }}
+          name: ubuntu-${{ matrix.variant }}-${{ github.run_id }}
+          path: artifacts/${{ matrix.variant }}/
           if-no-files-found: error
-          compression-level: 0
-
-      - name: Build EROFS lower and OverlayFS boot artifacts
-        run: ./build.sh overlay-root
+          compression-level: 1
