@@ -1,0 +1,27 @@
+From: JZ Loh <ljzyx86@qq.com>
+Subject: [PATCH] ASoC: es8389: keep the powered codec accessible on restart
+
+The SDK shutdown sequence isolates the codec's control interface. On
+systems whose codec supply remains enabled during a warm restart, the next
+probe cannot read the chip ID and subsequent ALSA register accesses fail
+with -ENXIO. Power cycling restores access; panic and watchdog resets,
+which skip device_shutdown(), also retain access.
+
+Cancel the delayed state worker on every shutdown, but reserve the deep
+power-down sequence for halt and power-off. A restarting kernel will probe
+and initialize the still-powered codec. This does not add board GPIOs or
+change the normal power-off sequence.
+
+--- a/sound/soc/codecs/es8389.c
++++ b/sound/soc/codecs/es8389.c
+@@ -832,6 +832,10 @@ static void es8389_i2c_shutdown(struct i2c_client *i2c)
+ 
+ 	cancel_delayed_work_sync(&es8389->state_work);
+ 
++	/* The control interface must survive a restart without a supply cycle. */
++	if (system_state == SYSTEM_RESTART)
++		return;
++
+ 	regmap_write(es8389->regmap, ES8389_MASTER_MODE_REG01, 0x28);
+ 	regmap_write(es8389->regmap, ES8389_HPSW_REG69, 0x00);
+ 	regmap_write(es8389->regmap, ES8389_VMID_REG60, 0x00);
