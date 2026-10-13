@@ -1,0 +1,90 @@
+# Ubuntu 26 release gates
+
+Run `python3 scripts/check-release-gates.py candidate.json acceptance.json
+--output promotion.json` after exporting the actual board test logs. Exit code
+zero and `promoted: true` require all five gates; incomplete evidence produces
+exit code one and a reason. A successful host fixture is not board acceptance.
+
+The candidate uses schema `ubuntu-candidate-v1`, product
+`ubuntu26-gnome` or `ubuntu26-server`, the intended hardware `serial`,
+`kernel_release`, and an `artifacts` object. Required keys are
+`boot`, `rootfs`, `userdata`, `uboot`, `kernel`, `initrd`, `dtb`, `modules`, and
+`source-manifest`. Each file record contains a relative `path` and its
+`sha256`. Keep the source manifest alongside the artifacts, recording source
+commits, dirty patches, build configuration, and platform asset checksums.
+Symlinks, directory escapes, missing files, and checksum changes fail.
+
+The immutable GNOME candidate must also declare `webgpu_backend`: `vulkan-core` or
+`gles-compat`. The `webgpu-hardware` target check records the matching `backend`,
+`feature_level` (`core` or `compatibility`), `fallback_adapter: false`,
+`render_readback: true` and `compute_values_checked: 256`. Promotion exports
+this capability explicitly. A compatibility candidate cannot be promoted as
+Vulkan/core, and changing the capability invalidates the candidate digest.
+RK3576 has hardware GLES compatibility evidence and laboratory Vulkan/core
+render, compute and canvas presentation evidence with an enabled GPU sandbox.
+The final candidate still needs its own complete acceptance. The gate verifies the requested hardware WebGPU capability without
+silently claiming the larger core feature set.
+
+Server uses its own target policy: first boot, physical wired networking,
+headless EGL, RKNPU/RKMPP/RGA, ISP 3A service, real audio I/O, kernel log review,
+actual pstore panic/watchdog reset and RT cyclictest. The image, continuous
+reboot and one-hour mixed soak requirements are identical. A Server candidate
+omits `webgpu_backend`; its promotion reports no desktop WebGPU capability.
+The current hardware acceptance profile requires these accelerators and a
+connected camera, independently of a board or SoC name. A different hardware
+profile needs a reviewed policy, not missing checks disguised as a pass.
+
+Acceptance uses schema `ubuntu-acceptance-v1`, the observed hardware
+`serial`, matching `kernel_release`, and `candidate_sha256`: SHA256 of the
+candidate JSON encoded with sorted keys and compact separators. The `image`
+and `target` objects contain the required check names defined at the top of
+the validator. Every check needs `status: passed`, integer `exit_code: 0`,
+and a `log` file record. Target checks also need their actual `boot_id` and
+`actual_hardware: true`, supported by the exported test log. Probe-only
+watchdog results, software GPU fallback, package installation, and build
+success cannot satisfy the corresponding hardware checks.
+
+The `reboot` array needs at least three continuous controlled cycles. Each
+records different `before_boot_id` and `after_boot_id`, `controlled: true`,
+`status: passed`, the expected `kernel_sha256`, and its `log`. Target evidence
+must come from a boot in this sequence. The `soak` object records the last
+boot ID, `status: passed`, workloads containing `gpu`, `video`, `npu`, and
+`cpu`, monotonic `heartbeat_seconds` covering at least 3600 seconds with no
+gap above 90 seconds, zero `workload_errors` and `unexpected_reboots`, and
+its `log`. A manually interrupted test remains incomplete.
+
+The validator checks evidence consistency and integrity. The test runners
+must collect truthful hardware observations; JSON labels alone do not
+establish video decoding, reset cause, latency, or image quality.
+
+Host verification: `python3 tests/host/test-release-gates.py` checks a
+synthetic complete fixture and rejects missing, stale, altered, unrelated,
+uncontrolled, and insufficient-duration evidence. Real GNOME promotion is
+pending until the current candidate completes every target gate. XFCE work
+follows that acceptance and requires its own product-specific gate policy.
+
+## Reusable mixed soak runner
+
+Run `tests/target/test-mixed-soak.py` as root on the identified target. Supply
+the expected hardware serial, test checkout, GPU stack and a new output
+directory. It starts GPU, video, NPU and two CPU workers, records monotonic
+heartbeats, monitors the boot ID and temperatures, and fails when a worker
+fails. Each attempt keeps its own output and process groups; cleanup does not
+stop unrelated desktop applications.
+
+```bash
+python3 tests/target/test-mixed-soak.py \
+  --serial "$DUT_SERIAL" --gpu-stack panfrost \
+  --tests "$PWD/tests/target" --work /var/lib/ubuntu-qa/soak-attempt \
+  --mode desktop --user "$DESKTOP_USER" --video /var/lib/ubuntu-qa/real-video.mp4 \
+  --npu-qa-mode functional --seconds 3605
+```
+
+Use `--mode server` for the hardware MPP encode/decode pipeline instead of
+the headed Chromium movie. `--user` and `--video` are required for desktop;
+the supplied desktop user must be unprivileged. The default NPU mode is
+`latency` and retains the 15 ms ceiling. Select `functional` only when
+performance qualification is explicitly deferred; the result records that
+scope and does not certify loaded RT performance. Transfer `result.json`,
+the heartbeat log and worker logs before changing the tested image. A
+successful short smoke run never substitutes for one hour in promotion.
