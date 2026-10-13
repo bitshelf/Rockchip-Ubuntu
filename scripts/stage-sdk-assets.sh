@@ -38,7 +38,7 @@ esac
 declare -A CALLER_ENV=()
 for env_name in BUILD_OUTPUT_DIR SDK_DIR SDK_OUTPUT_DIR SDK_KERNEL_CONFIG \
     SOC_MODEL PLATFORM_ASSET_DIR KERNEL_MODULE_CONFIG \
-    KERNEL_CONFIG_REQUIREMENTS LOCAL_DEB_CONFIG; do
+    KERNEL_CONFIG_REQUIREMENTS LOCAL_DEB_CONFIG CAMERA_IQ_DIR; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -68,6 +68,7 @@ PLATFORM_ASSET_DIR="${PLATFORM_ASSET_DIR:-${BUILD_OUTPUT_DIR}/platform-assets/${
 KERNEL_MODULE_CONFIG="${KERNEL_MODULE_CONFIG:-${PROJECT_DIR}/config/kernel-modules/modules.conf}"
 KERNEL_CONFIG_REQUIREMENTS="${KERNEL_CONFIG_REQUIREMENTS:-${PROJECT_DIR}/config/kernel/overlay-root.conf}"
 LOCAL_DEB_CONFIG="${LOCAL_DEB_CONFIG:-${PROJECT_DIR}/config/local-debs/packages.conf}"
+CAMERA_IQ_DIR="${CAMERA_IQ_DIR:-}"
 
 [[ "$SOC_MODEL" =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||
     die "invalid SOC_MODEL: $SOC_MODEL"
@@ -108,7 +109,9 @@ validate_existing_bundle() {
         die "missing platform asset schema marker: $root"
     schema="$(<"${root}/.platform-asset-root")"
     case "$schema" in
-        schema=ubuntu-platform-assets-v4) validate_bundle "$root" ;;
+        # Ownership and integrity qualify an older generation for replacement.
+        # The new staged generation still passes all current semantic checks.
+        schema=ubuntu-platform-assets-v4) validate_checksums "$root" ;;
         schema=ubuntu-platform-assets-v3) validate_checksums "$root" ;;
         schema=ubuntu-platform-assets-v2) validate_checksums "$root" ;;
         # v1 predates the repository-owned checksum contract. The marker is
@@ -145,6 +148,7 @@ validate_bundle() {
         "${root}/boot/kernel.config" "$KERNEL_CONFIG_REQUIREMENTS" >/dev/null
     python3 "${PROJECT_DIR}/scripts/check-boot-logos.py" "${root}/boot"
     local module_source module_target autoload module_count=0
+    local -a kernel_match_args=(--release "$release")
     while IFS=$'\t' read -r module_source module_target autoload; do
         [[ "$module_source" != /* && "$module_source" != *..* &&
            "$module_target" == kernel/* && "$module_target" != *..* &&
@@ -155,6 +159,7 @@ validate_bundle() {
            ! -L "${modules_root}/${module_target}" ]] ||
             die "missing selected kernel module: ${module_target}"
         (( module_count += 1 ))
+        kernel_match_args+=(--module "${modules_root}/${module_target}")
     done <"${root}/module-manifest.tsv"
     (( module_count > 0 )) || die "module manifest is empty"
     [[ "$(find "$modules_root" -type f -name '*.ko' | wc -l)" -eq "$module_count" ]] ||
@@ -180,8 +185,12 @@ validate_bundle() {
         [[ "$actual" == "${deb_package}"$'\t'"${deb_version}"$'\t'"${deb_arch}" ]] ||
             die "local DEB metadata changed: ${deb_name}"
         (( deb_count += 1 ))
+        if [[ "$deb_purpose" == kernel-headers ]]; then
+            kernel_match_args+=(--headers "$deb_path")
+        fi
     done <"${root}/local-deb-manifest.tsv"
     (( deb_count > 0 )) || die "local DEB manifest is empty"
+    python3 "${PROJECT_DIR}/scripts/check-kernel-assets.py" "${kernel_match_args[@]}"
     [[ "$(find "${root}/debs" -maxdepth 1 -type f -name '*.deb' | wc -l)" -eq "$deb_count" ]] ||
         die "unlisted Debian packages are present in the platform assets"
     find "${root}/boot" -maxdepth 1 -type f -name '*.dtb' -print -quit |
@@ -250,8 +259,9 @@ stage_bundle() {
     stage="$(mktemp -d "${parent}/.${SOC_MODEL}.stage.XXXXXX")"
     chmod 2750 "$stage"
     previous="${parent}/.${SOC_MODEL}.previous.$$"
-    cleanup_stage() { rm -rf -- "$stage" "$previous"; }
-    trap cleanup_stage EXIT
+    local cleanup_command
+    printf -v cleanup_command 'rm -rf -- %q %q' "$stage" "$previous"
+    trap "$cleanup_command" EXIT
 
     install -d -m 0755 "$stage/boot" "$stage/modules/lib/modules" \
         "$stage/debs"
@@ -333,6 +343,20 @@ stage_bundle() {
             "$deb_package" "$deb_version" "$deb_arch" "$deb_purpose" \
             >>"$stage/local-deb-manifest.tsv"
     done
+    if [[ -n "$CAMERA_IQ_DIR" ]]; then
+        [[ "$CAMERA_IQ_DIR" == /* && -d "$CAMERA_IQ_DIR" && ! -L "$CAMERA_IQ_DIR" ]] ||
+            die "CAMERA_IQ_DIR must be an absolute directory"
+        mapfile -d '' -t iq_files < <(
+            find "$CAMERA_IQ_DIR" -maxdepth 1 -type f -name '*.json' -print0 | sort -z
+        )
+        (( ${#iq_files[@]} > 0 )) || die "CAMERA_IQ_DIR contains no IQ JSON files"
+        install -d -m 0755 "$stage/iqfiles"
+        for iq_file in "${iq_files[@]}"; do
+            [[ -s "$iq_file" && "$(basename "$iq_file")" =~ ^[A-Za-z0-9_.+-]+\.json$ ]] ||
+                die "invalid IQ file: $iq_file"
+            install -m 0644 "$iq_file" "$stage/iqfiles/"
+        done
+    fi
     printf '%s\n' "$release" >"$stage/kernel-release"
     printf 'schema=ubuntu-platform-assets-v4\n' >"$stage/.platform-asset-root"
 

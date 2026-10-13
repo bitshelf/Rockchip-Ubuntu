@@ -32,8 +32,8 @@ PY
 export BOOTFS_REQUIRE_LOGOS=1
 cp "${PROJECT_DIR}/config/kernel/overlay-root.conf" "$asset_dir/boot/kernel.config"
 printf '6.99-test\n' >"$asset_dir/kernel-release"
-printf 'module\n' \
-    >"$asset_dir/modules/lib/modules/6.99-test/kernel/drivers/test/test.ko"
+python3 "$PROJECT_DIR/tests/host/make-kernel-module-fixture.py" \
+    "$asset_dir/modules/lib/modules/6.99-test/kernel/drivers/test/test.ko" 6.99-test
 printf 'drivers/test/test.ko\tkernel/drivers/test/test.ko\ttest\n' \
     >"$asset_dir/module-manifest.tsv"
 printf 'kernel/fs/overlayfs/overlay.ko\n' \
@@ -66,6 +66,8 @@ dtc -q -@ -I dts -O dtb -o "$asset_dir/boot/test-overlay.dtbo" \
 
 deb_root="${tmp_dir}/deb"
 install -d "$deb_root/DEBIAN"
+install -d "$deb_root/usr/src/linux-headers-6.99-test/include/config"
+printf '6.99-test\n' >"$deb_root/usr/src/linux-headers-6.99-test/include/config/kernel.release"
 printf '%s\n' \
     'Package: test-headers' \
     'Version: 1-test' \
