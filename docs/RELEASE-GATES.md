@@ -57,6 +57,22 @@ The validator checks evidence consistency and integrity. The test runners
 must collect truthful hardware observations; JSON labels alone do not
 establish video decoding, reset cause, latency, or image quality.
 
+Package-hold and dynamic-linker probes consume their producer's complete
+output under `pipefail`. An early-exiting matcher can otherwise produce a
+SIGPIPE and report an installed package or resolved library as missing.
+`tests/host/test-package-hold-checks.sh` exercises slow, long producer output,
+missing matches and producer failures. Keep failed soak runs and restart the
+entire duration after correcting a test-runner error; do not append their
+heartbeats to a later run or change inference thresholds to obtain a pass.
+
+When performance qualification is explicitly deferred, a separate functional
+soak may select `RKNPU_QA_MODE=functional`. This still requires all 200 inference
+samples, correct classification, sufficient confidence and positive timings,
+and records min/mean/max latency. It does not certify the 15 ms latency limit;
+the default `latency` mode and its failed performance records remain unchanged.
+Declare this scope in the acceptance report and keep it distinct from loaded
+RT or NPU performance qualification.
+
 Host verification: `python3 tests/host/test-release-gates.py` checks a
 synthetic complete fixture and rejects missing, stale, altered, unrelated,
 uncontrolled, and insufficient-duration evidence. Real GNOME promotion is

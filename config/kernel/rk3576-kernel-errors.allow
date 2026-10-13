@@ -1,0 +1,78 @@
+# 已与同一 SDK/内核的 Debian 基线逐项对照，并由对应功能测试覆盖。
+# 每行必须是锚定的 ERE；新增或变化的 error-level 日志仍会使 QA 失败。
+# 新增条目必须注明来源与原因，禁止使用尾部 .* 的宽匹配。
+^OF: fdt: Reserved memory: failed to reserve memory for node 'drm-cubic-lut@0': base 0x0000000000000000, size 0 MiB$
+^fiq_debugger fiq_debugger\.0: error -ENXIO: IRQ (fiq|wakeup) not found$
+^fiq_debugger_probe: could not install nmi irq handler$
+^rockchip-usb2phy 2602e000\.syscon:usb2-phy@(0|2000): error -ENXIO: IRQ index 0 not found$
+^rockchip-hdptx-phy-hdmi 2b000000\.hdmiphy: hdptx phy (pll|lane) locked!$
+^arm-scmi firmware:scmi: Failed\. SCMI protocol (17|22) not active\.$
+^OF: graph: no port node found in /dp@27e40000$
+^rk_gmac-dwmac 2a2(20000|30000)\.ethernet: Can not read property: rx_delay\.$
+^rk_gmac-dwmac 2a2(20000|30000)\.ethernet: set rx_delay to 0xffffffff$
+^rk_gmac-dwmac 2a2(20000|30000)\.ethernet: cannot get clock (mac_clk_rx|mac_clk_tx|clk_mac_speed)$
+^rk806 1-0023: no sleep-setting state$
+# rk806-core.c treats absent optional pmic-power-off pinctrl as NULL,
+# matching its already-covered sleep/reset/DVS pinctrl lookup behavior.
+^rk806 1-0023: no power-off pinctrl state$
+^rk806 1-0023: no (reset-setting|dvs-setting) pinctrl state$
+^rk-crypto 2a400000\.crypto: invalid resource$
+^mpp_rkvdec2 27b00100\.rkvdec: (shared_niu_a|shared_niu_h|shared_video_cabac) is not found!$
+^rkvdec2_init:12(50: No niu aclk|53: No niu hclk|59: No cabac) reset resource define$
+^mpp_rkvenc2 27a(00000|10000)\.rkvenc-core: failed to (init opp info|init_opp_table)$
+# SDK RT application shifts this unchanged devfreq-disabled probe to line 2394.
+^rkvenc_init:(2394|2397): failed to add venc devfreq$
+^debugfs: Directory 'vdd_logic_s0' with parent 'vdd_logic_s0' already present!$
+^debugfs: Directory '27800000\.gpu-mali' with parent 'vdd_gpu_s0' already present!$
+^debugfs: Directory '27700000\.npu-rknpu' with parent 'vdd_npu_s0' already present!$
+^debugfs: File 'Capture' in directory 'dapm' already present!$
+^rockchip-vop2 27d00000\.vop: Supported VOP aclk dvfs, normal mode:500000000, reset mode:594000000, advanced mode:702000000$
+^rockchip-drm display-subsystem: route-hdmi: failed to get logo,offset$
+# The unused DP boot-logo route may have no loader-provided logo offset.
+# This does not cover display link, scanout or compositor errors.
+^rockchip-drm display-subsystem: route-dp0: failed to get logo,offset$
+^rockchip-drm display-subsystem: failed to show kernel logo$
+^rockchip-dmc dmc: failed to get vop pn to msch rl$
+^RKNPU 27700000\.npu: can't request region for resource \[mem 0x2770(0000-0x27707fff|8000-0x2770ffff)\]$
+^rk-pcie 2a200000\.pcie: PCIe Link Fail, LTSSM is 0x3, hw_retries=(0|1)$
+^rk-pcie 2a200000\.pcie: failed to initialize host$
+^\[dhd\] _dhd_module_init: in Dongle Host Driver, version 101\.10\.591\.52\.27 \(20240409-1\)\(20240411-2\)\(d83d8d7\)$
+^drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd compiled on [A-Za-z]{3} [ 0-9][0-9] [0-9]{4} at [0-9]{2}:[0-9]{2}:[0-9]{2}$
+^\[dhd\] STATIC-MSG\) dhd_static_buf_init : 101\.10\.361\.36 \(wlan=r892223-20231107-1\)$
+^\[dhd\] STATIC-MSG\) dhd_init_wlan_mem : prealloc ok for index 0: 1102848\(1077K\)$
+# Exact SDK static-buffer teardown banner; this is not Wi-Fi readiness proof.
+^\[dhd\] STATIC-MSG\) dhd_static_buf_exit : Enter$
+^\[dhd\] STATIC-MSG\) dhd_wlan_mem_prealloc : section [0-9]+, size [0-9]+$
+# TPM2_RC_INITIALIZE (0x100) triggers tpm2_auto_startup's Startup + SelfTest.
+# The log QA additionally requires a successful TPM2_GetRandom command.
+^tpm tpm0: A TPM error \(256\) occurred attempting the self test$
+
+# --- camera pipeline rework (OV13855 on CAM3, 验收基线) ---
+# The sensor-less rkcif chains (mipi-lvds / mipi-lvds1 and the scale/tools
+# channels) probe their absent sensors at every boot; the messages below
+# are their fixed, non-fatal probe noise. The sample camera sensor is
+# optional carrier hardware: benches without the module log the failed ID
+# read below on every boot.
+^: get_remote_sensor: video pad\[0\] is null$
+^: rkcif_update_sensor_info: stream\[[0-9]+\] get remote sensor_sd failed!$
+^: terminal subdev does not exist$
+^rkcif rkcif-mipi-lvds[0-9]*: rkcif is_detect_group_sync 1$
+^rkcif-mipi-lvds[0-9]*: There is not terminal subdev, not synchronized with ISP$
+^rkcif-mipi-lvds[0-9]*: rkcif_update_sensor_info: stream\[[0-9]+\] get remote terminal sensor failed!$
+^rkcif_(scale_ch[0-3]|tools_id[0-2]): update sensor info failed -19$
+^stream_cif_mipi_id[0-3]: update sensor info failed -19$
+^rockchip-mipi-csi2: Async registered subdev$
+# The attached OV13855 must bind successfully. Sensor probe failures,
+# CMA allocation failures and audio errors are never accepted here.
+# systemd BPF-LSM probe on a kernel without the bpf-restrict-fs object.
+^systemd\[[0-9]+\]: bpf-restrict-fs: Failed to load BPF object: No such process$
+# A cold or uninitialized RX8025 may reject hctosys. Accept only after
+# target QA confirms NTP synchronization and a readable, current RTC.
+^rx8025 3-0032: hctosys: unable to read the hardware clock$
+
+# SDK VOP2 devfreq initialization is optional: its caller keeps scanout
+# running when vop-supply is absent. Require the explicit driver fallback
+# banner in target QA; display/GPU acceptance remains a separate gate.
+^rockchip-vop2 27d00000\.vop: error -ENODEV: _opp_set_regulators: no regulator \(vop\) found$
+^rockchip-vop2 27d00000\.vop: failed to set opp config$
+^rockchip-vop2 27d00000\.vop: failed to init opp info$

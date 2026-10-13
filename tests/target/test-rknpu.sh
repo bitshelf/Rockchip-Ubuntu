@@ -5,6 +5,7 @@ RKNPU_LOOPS=200
 RKNPU_MAX_LATENCY_MS="${RKNPU_MAX_LATENCY_MS:-15}"
 RKNPU_MIN_TOP1="${RKNPU_MIN_TOP1:-0.5}"
 RKNPU_EXPECTED_TOP1_CLASS="${RKNPU_EXPECTED_TOP1_CLASS:-156}"
+RKNPU_QA_MODE="${RKNPU_QA_MODE:-latency}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -95,10 +96,11 @@ rknpu_validate_output() {
         echo "top-1 confidence ${confidence:-missing} is below $RKNPU_MIN_TOP1" >&2
         return 1
     }
+    [[ "$RKNPU_QA_MODE" == latency || "$RKNPU_QA_MODE" == functional ]] || return 1
     read -r min_ms avg_ms max_ms < <(
-        printf '%s\n' "${timings[@]}" | awk -v limit="$RKNPU_MAX_LATENCY_MS" '
+        printf '%s\n' "${timings[@]}" | awk -v limit="$RKNPU_MAX_LATENCY_MS" -v mode="$RKNPU_QA_MODE" '
             NR == 1 { min=$1; max=$1 }
-            $1 <= 0 || $1 >= limit { bad=1 }
+            $1 <= 0 || (mode == "latency" && $1 >= limit) { bad=1 }
             $1 < min { min=$1 }
             $1 > max { max=$1 }
             { sum += $1 }
@@ -114,6 +116,7 @@ rknpu_validate_output() {
     printf 'RKNPU_SOAK_OK completed=%s expected=%s top1_class=%s top1=%s min_ms=%s avg_ms=%s max_ms=%s limit_ms=%s\n' \
         "$expected" "$expected" "$class" "$confidence" "$min_ms" "$avg_ms" \
         "$max_ms" "$RKNPU_MAX_LATENCY_MS"
+    [[ "$RKNPU_QA_MODE" != functional ]] || echo 'RKNPU_PERFORMANCE_QA=not_validated mode=functional'
 }
 
 rknpu_run_as_user() {
@@ -133,10 +136,12 @@ run_rknpu_qa() {
     for package in librknnrt2 rknn-server rknn-models; do
         [[ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null)" == installed ]] ||
             fail "$package is not installed"
-        apt-mark showhold | grep -Fxq "$package" || fail "$package is not held"
+        apt-mark showhold | grep -Fx "$package" >/dev/null || fail "$package is not held"
     done
     command -v rknn_common_test >/dev/null || fail "rknn_common_test is missing"
-    ldd /usr/bin/rknn_common_test | grep -Eq 'librknnrt[.]so => /' ||
+    # Consume producer output fully: grep -q can close these pipes early
+    # and turn a successful package/linker probe into SIGPIPE under load.
+    ldd /usr/bin/rknn_common_test | grep -E 'librknnrt[.]so => /' >/dev/null ||
         fail "rknn_common_test cannot resolve librknnrt.so"
     systemctl is-active --quiet rknn-server.service || fail "rknn-server.service is not active"
 

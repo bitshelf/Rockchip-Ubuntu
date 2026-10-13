@@ -33,6 +33,20 @@ for bad in \
     fi
 done
 
+# Functional port acceptance records latency without certifying a performance
+# ceiling. Inference count, classification and positive timing still fail closed.
+RKNPU_QA_MODE=functional
+rknpu_validate_output "$(fixture_output 200 49.42 0.935059 156)" 200 >/dev/null ||
+    fail 'functional inference incorrectly enforced the latency ceiling'
+for bad in "$(fixture_output 199 49.42 0.935059 156)" \
+    "$(fixture_output 200 49.42 0.935059 155)" \
+    "$(fixture_output 200 0.00 0.935059 156)"; do
+    if rknpu_validate_output "$bad" 200 >/dev/null 2>&1; then
+        fail 'functional inference accepted incomplete or invalid output'
+    fi
+done
+RKNPU_QA_MODE=latency
+
 for purpose in rknpu-runtime rknpu-tools rknpu-models; do
     grep -Fq "|$purpose\"" "$PROJECT_DIR/config/local-debs/packages.conf" ||
         fail "missing local package purpose: $purpose"
