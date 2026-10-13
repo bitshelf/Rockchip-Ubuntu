@@ -1,0 +1,10 @@
+{
+  "schema": "ubuntu-feature-qa-v1",
+  "feature": "overlay-userdata-online-resize",
+  "host": "native-arm64-209",
+  "test": "tests/host/test-overlay-online-resize.sh",
+  "host_test_passed": true,
+  "checks": ["future-mount-time", "offline-resize-rejection", "online-growth", "sentinel-persistence", "e2fsck"],
+  "current_candidate_hardware_tested": false,
+  "promoted": false
+}
