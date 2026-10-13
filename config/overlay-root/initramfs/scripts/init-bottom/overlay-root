@@ -47,12 +47,15 @@ case "$fsck_rc" in
     0|1) ;;
     *) panic "overlay data fsck failed ($fsck_rc)" ;;
 esac
-resize2fs "$OVERLAY_ROOT_DATA_DEVICE" >/dev/console 2>&1 ||
-    panic "cannot grow overlay data filesystem"
-
 mkdir -p "$lower" "$data" "$merged"
 mount -o rw,noatime "$OVERLAY_ROOT_DATA_DEVICE" "$data" ||
     panic "cannot mount overlay data filesystem"
+# Grow through ext4's online resize after the successful unmounted check.
+# With an invalid RTC, fsck can run before the stored last-mount timestamp;
+# offline resize then rejects a clean filesystem because lastcheck < mtime.
+# Do not bypass filesystem checks with resize2fs -f or modify the board clock.
+resize2fs "$OVERLAY_ROOT_DATA_DEVICE" >/dev/console 2>&1 ||
+    panic "cannot grow overlay data filesystem"
 mkdir -p "$data/upper" "$data/work"
 
 # rootmnt is supplied by initramfs-tools /scripts/functions.
