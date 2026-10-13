@@ -30,9 +30,34 @@ for restriction in PrivateNetwork NetworkNamespacePath User DynamicUser \
     ! grep -Eq "^[[:space:]]*${restriction}=" "$service" ||
         fail "unnecessary adbd restriction is present: ${restriction}"
 done
-grep -Fq 'for path in /sys/class/udc/*' "$gadget" ||
+grep -Fq 'udc_class=/sys/class/udc' "$gadget" ||
     fail "USB gadget does not discover UDCs dynamically"
 ! grep -Eq '/sys/class/udc/[0-9a-f]+\.' "$gadget" ||
     fail "USB gadget contains a board-specific UDC path"
+
+# Exercise the controller lifecycle against sysfs-like files: repeated binds
+# must retain the original policy, and reset must issue a real ConfigFS write.
+GADGET_LIBRARY="$gadget" FIXTURE="$tmp_dir/controller" sh <<'SH'
+set -eu
+RK_ADBD_GADGET_LIBRARY_ONLY=1
+. "$GADGET_LIBRARY"
+gadget="$FIXTURE/gadget"
+udc_class="$FIXTURE/udc"
+power_state="$FIXTURE/state"
+mkdir -p "$gadget" "$udc_class/mock/device/power"
+printf 'auto\n' >"$udc_class/mock/device/power/control"
+hold_controller mock
+hold_controller mock
+[ "$(cat "$power_state/mock")" = auto ]
+[ "$(cat "$udc_class/mock/device/power/control")" = on ]
+printf 'mock\n' >"$gadget/UDC"
+unbind
+[ "$(wc -c <"$gadget/UDC")" -eq 1 ]
+[ "$(cat "$udc_class/mock/device/power/control")" = auto ]
+[ ! -e "$power_state/mock" ]
+# Controllers with no runtime-PM interface remain supported.
+hold_controller no-power-control
+release_controller no-power-control
+SH
 
 echo "ADB root shell and host-network policy checks passed"
