@@ -40,4 +40,4 @@ legacy-bootable 分区而回退到 uboot 分区。使用 JR3576 defconfig，并�
 JR3576 已取得额外 uboot 分区授权，完整回读校验和 extlinux 启动通过。
 `0004` 禁用预重定位阶段绑定的 ADC 下载键，与内核 DTB 的禁用状态一致；
 否则旧键设备会在早期 DTB 切换后继续检测并强制下载模式。UART ctrl+d
-下载入口保留。见 `docs/QA-SERVER-JR3576-20261010.md`。
+下载入口保留。具体板级验收记录保存在 Git 忽略的输出目录。

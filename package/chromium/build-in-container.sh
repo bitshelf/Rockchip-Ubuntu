@@ -33,7 +33,7 @@ export PATH="${depot_tools}:${PATH}"
 export DEPOT_TOOLS_UPDATE=0
 
 apply_platform_patches() {
-    local patch_dir="${CHROMIUM_PATCH_DIR:-/workspace/docs/patches/chromium}"
+    local patch_dir="${CHROMIUM_PATCH_DIR:-/workspace/package/chromium/patches}"
     [[ -n "$patch_dir" ]] || return 0
     [[ -d "$patch_dir" ]] || die "Chromium platform patch directory is missing: $patch_dir"
     [[ -s "$patch_dir/series" ]] || die "Chromium platform patch series is missing: $patch_dir/series"
@@ -114,6 +114,9 @@ done < <(find "${output}/payload" -type f -exec sh -c \
 {
     printf 'source.version=%s\nsource.kind=%s\n' "$version" "${CHROMIUM_SOURCE_KIND:-checkout}"
     [[ ! -f "$src/.source-info" ]] || cat "$src/.source-info"
-    sha256sum "$build_dir/args.gn" /workspace/docs/patches/chromium/*.patch
+    sha256sum "$build_dir/args.gn"
+    while IFS= read -r patch_name; do
+        [[ -z "$patch_name" ]] || sha256sum "${CHROMIUM_PATCH_DIR:-/workspace/package/chromium/patches}/$patch_name"
+    done < "${CHROMIUM_PATCH_DIR:-/workspace/package/chromium/patches}/series"
 } > "$output/build-info"
 echo "CHROMIUM_ARM64_PAYLOAD_OK"

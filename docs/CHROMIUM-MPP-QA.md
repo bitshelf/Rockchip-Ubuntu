@@ -1,7 +1,7 @@
 # Chromium MPP/V4L2 验收
 
 Desktop 使用仓库构建的 ARM64 Chromium DEB。`use_v4l2_codec=true` 启用
-V4L2 解码路径；`docs/patches/chromium/series` 将设备操作接到 libv4l2，
+V4L2 解码路径；`package/chromium/patches/series` 将设备操作接到 libv4l2，
 由 libv4l-rkmpp 将 `/dev/video-dec0` 的 stateful V4L2 请求转换为 Rockchip MPP。
 构建核对源码版本，记录官方源码归档 SHA256、补丁和 GN 参数校验值。
 编译、安装成功均不能代替硬件解码证明。
