@@ -34,7 +34,7 @@ Git 忽略的 `artifacts/` 中。
 独立 bootfs 没有 RKIMG resource，必须启用早期 distro DTB 并指定
 `/dtb/board.dtb`。`0003` 用 GPT `boot` 名称选择分区，避免旧实现只扫描
 legacy-bootable 分区而回退到 uboot 分区。使用 JR3576 defconfig，并在
-构建副本合并 `artifacts/uboot.config`，随后运行 olddefconfig
+构建副本合并 `config/bootfs/extlinux-early-dtb.config`，随后运行 olddefconfig
 和 SDK 配套 `make.sh`。配置片段必须复制到构建副本并纳入生产构建输入。
 
 JR3576 已取得额外 uboot 分区授权，完整回读校验和 extlinux 启动通过。
