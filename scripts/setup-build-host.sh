@@ -267,6 +267,7 @@ install_host_packages() {
 
     [[ -d /tmp && ! -L /tmp ]] || die "/tmp must be a real directory"
     chmod 1777 /tmp
+    install -d -m 1777 /tmp /var/tmp
     export DEBIAN_FRONTEND=noninteractive
     export TMPDIR=/tmp
     apt-get update

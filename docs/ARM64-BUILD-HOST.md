@@ -129,6 +129,12 @@ sudo ./scripts/setup-build-host.sh --check
 
 ## 网络代理
 
+构建器先缓存官方 HTTP seed 镜像，对临时 HTTP 错误有限重试；镜像不可用时，
+回退到官方 Launchpad `ubuntu-seeds` Git 仓库的同一发行分支，并记录提交号。
+部分下载会先丢弃，不会混入 Git 缓存；缺少分支或 `STRUCTURE` 时停止构建，
+不会自动改用另一发行版。已有完整缓存可继续复用。
+上游来源见 [官方 seed 管理说明](https://ubuntu.com/project/docs/staging/release-team/seed-management/)。
+
 可以复制 `.env.example` 为不提交的 `.env`，也可以直接传入环境变量：
 
 ```bash

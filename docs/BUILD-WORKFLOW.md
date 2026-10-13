@@ -4,7 +4,7 @@
 
 本页集中说明构建主机分工、SDK 输入、文件系统合成和镜像打包入口。
 首次搭建先阅读 [ARM64 主机准备](ARM64-BUILD-HOST.md)，上传与 CI 操作见
-二进制输入上传指南。
+[二进制输入上传指南](UPLOAD-ASSETS.md)。
 
 ## 构建拓扑
 
@@ -45,7 +45,8 @@ Forgejo 和 GitHub CI 使用相同下载/校验接口：
 ```
 
 目录布局与发布方法见 [SDK-ASSETS.md](SDK-ASSETS.md)，双 CI 变量见
-[CI-ASSETS.md](CI-ASSETS.md)。
+[CI-ASSETS.md](CI-ASSETS.md)。kernel、U-Boot、DEB、KO 的命令行与网页上传步骤见
+[上传指南](UPLOAD-ASSETS.md)。
 
 ## 独立 bootfs
 

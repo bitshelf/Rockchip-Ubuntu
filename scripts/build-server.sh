@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -132,7 +133,7 @@ if [[ "$MODE" == check ]]; then
 fi
 
 if [[ "$EUID" -ne 0 ]]; then
-    exec sudo --preserve-env=BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
+    exec sudo --preserve-env=PYTHONDONTWRITEBYTECODE,BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
         "$0" "${BUILD_ARGS[@]}"
 fi
 
@@ -163,30 +164,7 @@ clean_workdir() {
     rm -rf -- "$WORK_DIR"
 }
 
-cache_seed() {
-    local seed_name="$1" archive_url stage repo
-    repo="${SEED_CACHE_ROOT}/${seed_name}"
-    [[ -s "${repo}/STRUCTURE" && -d "${repo}/.git" ]] && return
-    stage="$(mktemp -d "${SEED_CACHE_ROOT}/.${seed_name}.XXXXXX")"
-    archive_url="https://ubuntu-archive-team.ubuntu.com/seeds/${seed_name}.${UBUNTU_SERIES}/"
-    info "Cache Canonical ${seed_name}.${UBUNTU_SERIES} seed"
-    if ! env http_proxy="${HTTP_PROXY:-}" https_proxy="${HTTPS_PROXY:-}" \
-        no_proxy="${NO_PROXY:-}" wget --quiet --mirror --no-parent \
-        --no-host-directories --cut-dirs=2 --reject='index.html*' \
-        --timeout=30 --tries=3 --retry-connrefused \
-        --directory-prefix="$stage" "$archive_url"; then
-        rm -rf -- "$stage"
-        die "cannot download $archive_url"
-    fi
-    [[ -s "${stage}/STRUCTURE" ]] || die "incomplete ${seed_name} seed cache"
-    git -C "$stage" init --quiet --initial-branch="$UBUNTU_SERIES"
-    git -C "$stage" config user.email builder@localhost
-    git -C "$stage" config user.name "Ubuntu Image Builder"
-    git -C "$stage" add -A
-    git -C "$stage" commit --quiet -m "Import Canonical ${seed_name}.${UBUNTU_SERIES} seed"
-    rm -rf -- "$repo"
-    mv "$stage" "$repo"
-}
+. "${SCRIPT_DIR}/lib/ubuntu-seeds.sh"
 
 cache_product_seed() {
     local source="${PROJECT_DIR}/config/ubuntu-image/seeds"
