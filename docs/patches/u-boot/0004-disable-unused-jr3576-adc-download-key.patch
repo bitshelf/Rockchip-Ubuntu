@@ -1,0 +1,18 @@
+From: Ubuntu Embedded Team <builder@localhost>
+Subject: [PATCH] rk3576: disable unused JR3576 ADC download key
+
+Match the JR3576 kernel DTS adc-keys status. Pre-relocation key devices
+otherwise survive the early kernel DTB switch and force Rockusb mode.
+The UART ctrl+d download hotkey remains available.
+
+--- a/arch/arm/dts/myd-jr3576.dts
++++ b/arch/arm/dts/myd-jr3576.dts
+@@ -18,7 +18,7 @@
+ 		io-channel-names = "buttons";
+ 		keyup-threshold-microvolt = <1800000>;
+ 		u-boot,dm-pre-reloc;
+-		status = "okay";
++		status = "disabled";
+ 
+ 		volumeup-key {
+ 			u-boot,dm-pre-reloc;

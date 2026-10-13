@@ -128,7 +128,7 @@ rknpu_run_as_user() {
 }
 
 run_rknpu_qa() {
-    local model_directory model image node user output marker
+    local model_directory model image node user user_groups output marker
     [[ "$(uname -m)" == aarch64 ]] || fail "target is not ARM64"
     for package in librknnrt2 rknn-server rknn-models; do
         [[ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null)" == installed ]] ||
@@ -147,6 +147,11 @@ run_rknpu_qa() {
     node="$(rknpu_render_node)" || fail "RKNPU device node is missing"
     user="$(rknpu_test_user)" || fail "no non-root QA account is available"
     [[ "$(id -u "$user")" -ne 0 ]] || fail "RKNPU QA must use a non-root account"
+    if [[ "$node" == /dev/dri/* ]]; then
+        user_groups=" $(id -nG "$user") "
+        [[ "$user_groups" == *" render "* && "$user_groups" == *" video "* ]] ||
+            fail "$user must belong to both render and video for DRM RKNPU access"
+    fi
 
     output="$(rknpu_run_as_user "$user" "$model" "$image" 2>&1)" || {
         printf '%s\n' "$output" >&2

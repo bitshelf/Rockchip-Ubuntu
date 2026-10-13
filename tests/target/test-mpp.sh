@@ -37,7 +37,7 @@ run_mpp_qa() {
     for tool in mpi_enc_test mpi_dec_test mpp_info_test stat timeout; do
         command -v "$tool" >/dev/null || fail "missing MPP QA tool: $tool"
     done
-    ldconfig -p | grep -q 'librockchip_mpp.so.1' ||
+    ldconfig -p | grep -F 'librockchip_mpp.so.1' >/dev/null ||
         fail "librockchip_mpp is not in the dynamic linker cache"
 
     work_dir="$(mktemp -d "${MPP_TEST_TMP_ROOT:-/run}/mpp-qa.XXXXXX")"

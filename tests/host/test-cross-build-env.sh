@@ -30,7 +30,7 @@ if NATIVE_ARCH_OVERRIDE=arm64 TARGET_DEB_ARCH=arm64 \
     fail "ARM64 native mode was accepted"
 fi
 
-if rg -n '26\.04|resolute|rk3576' "$SCRIPT" \
+if grep -R -E -n '26\.04|resolute|rk3576' "$SCRIPT" \
     "${PROJECT_DIR}/containers/cross-build"; then
     fail "cross-build implementation is tied to a release or SoC"
 fi

@@ -36,27 +36,34 @@ case "$mode" in
         mount_has_option "$backing_dir" rw || die "overlay backing store is not writable"
         backing_has_userdata_partlabel || die "overlay backing store is not PARTLABEL=userdata"
         install -d -m 0700 "$state_dir"
+        rm -f -- "$state_dir"/record-* "$state_dir"/.record-*.tmp
         token="$(date -u +%Y%m%dT%H%M%SZ)-$$"
         printf '%s\n' "$token" >"$state_dir/baseline"
         sync "$state_dir/baseline"
         printf '%s\n' "$token" >"$state_dir/armed"
         sync "$state_dir/armed"
+        sync "$state_dir"
         echo "POWER_LOSS_ARMED=$token"
         echo "Next: sudo $0 write-loop, then cut board power while it is running."
         ;;
     write-loop)
         [[ -s "$state_dir/armed" ]] || die "run prepare first"
+        token="$(<"$state_dir/armed")"
         sequence=0
         while :; do
             slot=$((sequence % 32))
             temporary="$state_dir/.record-${slot}.tmp"
             completed="$state_dir/record-${slot}"
             {
-                printf 'BEGIN %s\n' "$sequence"
+                printf 'BEGIN %s %s\n' "$token" "$sequence"
                 dd if=/dev/zero bs=1M count=4 status=none
-                printf '\nEND %s\n' "$sequence"
+                printf '\nEND %s %s\n' "$token" "$sequence"
             } >"$temporary"
+            # Publish only complete durable data; a power cut during the
+            # next temporary write must not corrupt an older completed slot.
+            sync "$temporary"
             mv -f -- "$temporary" "$completed"
+            sync "$state_dir"
             printf '%s\n' "$sequence" >"$state_dir/last-sequence"
             sequence=$((sequence + 1))
         done
@@ -82,11 +89,16 @@ case "$mode" in
         bad_records=0
         record_count=0
         while IFS= read -r -d '' record; do
-            record_count=$((record_count + 1))
             first="$(head -n1 "$record")"
             last="$(tail -n1 "$record")"
-            [[ "$first" =~ ^BEGIN[[:space:]]+([0-9]+)$ &&
-               "$last" == "END ${BASH_REMATCH[1]}" ]] || bad_records=$((bad_records + 1))
+            record_count=$((record_count + 1))
+            sequence="${first##* }"
+            expected_size=$((4194304 + ${#first} + ${#last} + 3))
+            [[ "$first" == "BEGIN $expected $sequence" &&
+               "$sequence" =~ ^[0-9]+$ &&
+               "$last" == "END $expected $sequence" &&
+               "$(stat -c %s "$record")" -eq "$expected_size" ]] ||
+                bad_records=$((bad_records + 1))
         done < <(find "$state_dir" -maxdepth 1 -type f -name 'record-*' -print0)
         (( record_count > 0 )) || die "no completed record survived the power cut"
         (( bad_records == 0 )) || die "found $bad_records torn completed records"

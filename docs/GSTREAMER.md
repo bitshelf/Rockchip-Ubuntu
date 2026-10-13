@@ -38,3 +38,6 @@ GSTREAMER_RKMPP_OK frames=100 encoder=mpph264enc decoder=mppvideodec
 ```
 
 该检查依赖真实 `/dev/mpp_service`，不能用 `gst-inspect` 成功代替硬件流水线验收。
+
+QA 在 decoder 后用 identity 统计实际输出 buffer，必须与输入帧数一致并到达 EOS。
+仅输入 `num-buffers=100` 或出现 EOS 不等于已解码 100 帧。
