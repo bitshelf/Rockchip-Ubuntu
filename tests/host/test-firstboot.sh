@@ -9,8 +9,20 @@ trap 'rm -rf -- "$tmp_dir"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 rootfs="$tmp_dir/rootfs"
-install -d "$rootfs"
+install -d "$rootfs/etc/default"
+printf '# user defaults\nSHELL=/bin/sh\nHOME=/home\n' >"$rootfs/etc/default/useradd"
+printf '# adduser defaults\nDSHELL=/bin/sh\nDHOME=/home\n' >"$rootfs/etc/adduser.conf"
+printf 'root:x:0:0:root:/root:/bin/sh\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n' >"$rootfs/etc/passwd"
 "$PROJECT_DIR/scripts/install-firstboot.sh" "$rootfs" --profile server
+grep -Fxq 'SHELL=/bin/bash' "$rootfs/etc/default/useradd" || fail "useradd default is not Bash"
+grep -Fxq 'DSHELL=/bin/bash' "$rootfs/etc/adduser.conf" || fail "adduser default is not Bash"
+grep -Fxq 'HOME=/home' "$rootfs/etc/default/useradd" || fail "useradd settings were discarded"
+grep -Fxq 'DHOME=/home' "$rootfs/etc/adduser.conf" || fail "adduser settings were discarded"
+grep -Fxq 'root:x:0:0:root:/root:/bin/bash' "$rootfs/etc/passwd" || fail "root shell is not Bash"
+grep -Fxq 'daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin' "$rootfs/etc/passwd" || fail "service shell changed"
+cp "$rootfs/etc/default/useradd" "$tmp_dir/useradd.before"
+"$PROJECT_DIR/scripts/install-firstboot.sh" "$rootfs" --profile server
+cmp "$tmp_dir/useradd.before" "$rootfs/etc/default/useradd" || fail "shell policy is not idempotent"
 [[ -x "$rootfs/usr/libexec/ubuntu-firstboot" ]] || fail "engine was not installed"
 [[ -f "$rootfs/var/lib/ubuntu-firstboot/pending" ]] || fail "console firstboot is not enabled by default"
 [[ -L "$rootfs/etc/systemd/system/multi-user.target.wants/ubuntu-firstboot.service" ]] || fail "firstboot unit is not enabled by default"
@@ -25,6 +37,8 @@ install -d "$enabled"
 [[ -f "$enabled/var/lib/ubuntu-firstboot/pending" ]] || fail "enabled integration has no pending marker"
 [[ -L "$enabled/etc/systemd/system/multi-user.target.wants/ubuntu-firstboot.service" ]] || fail "enabled integration has no unit link"
 grep -Fxq 'FIRSTBOOT_PROFILE=desktop' "$enabled/etc/default/ubuntu-firstboot" || fail "Desktop profile is missing"
+grep -Fxq 'SHELL=/bin/bash' "$enabled/etc/default/useradd" || fail "fresh Desktop useradd default is not Bash"
+grep -Fxq 'DSHELL=/bin/bash' "$enabled/etc/adduser.conf" || fail "fresh Desktop adduser default is not Bash"
 
 export UBUNTU_FIRSTBOOT_LIBRARY_ONLY=1
 # shellcheck disable=SC1090
