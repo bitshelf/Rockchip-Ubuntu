@@ -1,0 +1,9 @@
+{
+  "schema": "ubuntu-feature-qa-v1",
+  "feature": "jr3576-gnome-release-gate-validator",
+  "host_test": "tests/host/test-release-gates.py",
+  "host_tests_passed": true,
+  "hardware_tested": false,
+  "promoted": false,
+  "note": "Synthetic validator fixtures only; current GNOME board acceptance remains pending."
+}
