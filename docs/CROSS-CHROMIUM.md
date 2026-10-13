@@ -19,7 +19,7 @@ Chromium 构建使用上游 GN/Clang 双工具链在 x86_64 上构建 ARM64 payl
 源码按 Chromium 官方流程用 `fetch chromium`/`gclient sync` 准备，并切到当前
 Linux stable 版本。也可使用 Google 官方 release archive，记录 URL 与归档 SHA256
 到 `src/.source-info`，并设置 `CHROMIUM_SOURCE_KIND=archive`。
-默认应用仓库的 `docs/patches/chromium/series`；版本不匹配则停止。
+默认应用仓库的 `package/chromium/patches/series`；版本不匹配则停止。
 可通过 `CHROMIUM_PATCH_DIR` 指定容器内可访问的另一补丁目录。
 
 ## 构建与打包

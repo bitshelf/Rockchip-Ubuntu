@@ -1,4 +1,4 @@
-# JR3576 Chromium 155 hardware backends
+# Rockchip Chromium 155 hardware backends
 
 Apply `series` to the official Chromium 155.0.8059.39 source archive through
 `scripts/build-local-debs.sh chromium`. The archive and patch checksums are
@@ -21,8 +21,8 @@ included in the package's build-info.
 
 The real-footage test requires V4L2VideoDecoder in media-internals, platform
 decoding, advancing playback, open MPP resources and increasing rkvdec IRQs.
-The GPU sandbox remains enabled. See `docs/CHROMIUM-MPP-QA.md` and
-`docs/qa/jr3576-chromium-hardware-20261013.json` for the actual board evidence.
+The GPU sandbox remains enabled. See `docs/CHROMIUM-MPP-QA.md` for the procedure; keep board evidence in the
+ignored build output directory.
 
 The launcher starts the GPU sandbox before Mesa creates helper threads.
 Both decoder and WebGPU QA require `sandboxed=true` and no GPU process crashes.
