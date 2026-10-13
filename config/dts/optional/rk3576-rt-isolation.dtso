@@ -1,0 +1,16 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "rockchip,rk3576";
+
+    fragment@0 {
+        target-path = "/chosen";
+        __overlay__ {
+            /* Keep the serial console. The matching extlinux policy supplies
+             * root and RT arguments, without the SDK's trailing expedited RCU
+             * and rcu_nocbs=all overriding the explicit CPU7 policy. */
+            bootargs = "earlycon=uart8250,mmio32,0x2ad40000 console=ttyFIQ0";
+        };
+    };
+};

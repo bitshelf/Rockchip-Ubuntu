@@ -62,3 +62,12 @@ deb。Server 与 Desktop 使用独立 QA profile，危险和长时间 vendor 测
 ADB 使用 Ubuntu `adbd` 和通用 USB FunctionFS gadget，保持 root shell 与 host
 network namespace，使 `adb shell ip -c a` 与串口看到相同接口。移植与双通道 QA
 见 [ADB.md](ADB.md)。
+
+## 内核、稳定性与外设
+
+RT 配置及 cyclictest 见 [RT-KERNEL-QA.md](RT-KERNEL-QA.md)；
+日志 allowlist、pstore 与 watchdog 见 KERNEL-DIAGNOSTICS-QA.md。
+桌面音频、蓝牙和 DRM cursor 的验证分别见
+AUDIO-GNOME-QA.md、
+BLUETOOTH-GNOME-QA.md、
+DRM-CURSOR-GNOME-QA.md。
