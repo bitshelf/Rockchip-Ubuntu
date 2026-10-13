@@ -5,17 +5,48 @@ gadget=/sys/kernel/config/usb_gadget/rockchip
 config="$gadget/configs/b.1"
 function="$gadget/functions/ffs.adb"
 ffs=/dev/usb-ffs/adb
+udc_class=/sys/class/udc
+power_state=/run/rk-adbd-runtime-pm
 
 log()
 {
     echo "rk-adbd-gadget: $*" >&2
 }
 
+hold_controller()
+{
+    controller=$1
+    control="$udc_class/$controller/device/power/control"
+    [ -w "$control" ] || return 0
+    mkdir -p "$power_state"
+    if [ ! -f "$power_state/$controller" ]; then
+        cat "$control" >"$power_state/$controller"
+    fi
+    printf 'on\n' >"$control"
+}
+
+release_controller()
+{
+    controller=$1
+    saved="$power_state/$controller"
+    [ -f "$saved" ] || return 0
+    control="$udc_class/$controller/device/power/control"
+    if [ -w "$control" ]; then
+        cat "$saved" >"$control" || return 1
+    fi
+    rm -f "$saved"
+}
+
 unbind()
 {
     if [ -r "$gadget/UDC" ] && [ -n "$(cat "$gadget/UDC")" ]; then
-        printf '' >"$gadget/UDC" || true
+        # ConfigFS invokes the unbind operation only for a nonempty write.
+        printf '\n' >"$gadget/UDC" || return 1
     fi
+    for saved_controller in "$power_state"/*; do
+        [ -f "$saved_controller" ] || continue
+        release_controller "${saved_controller##*/}"
+    done
 }
 
 reset()
@@ -69,10 +100,11 @@ activate()
     done
 
     found=0
-    for path in /sys/class/udc/*; do
+    for path in "$udc_class"/*; do
         [ -e "$path" ] || continue
         found=1
         udc=${path##*/}
+        hold_controller "$udc" || { release_controller "$udc"; return 1; }
         if printf '%s\n' "$udc" >"$gadget/UDC"; then
             log "bound to UDC $udc"
             return 0
@@ -84,9 +116,11 @@ activate()
     return 1
 }
 
+if [ "${RK_ADBD_GADGET_LIBRARY_ONLY:-0}" != 1 ]; then
 case "${1:-}" in
     setup) setup ;;
     activate) activate ;;
     reset) reset ;;
     *) echo "usage: $0 {setup|activate|reset}" >&2; exit 2 ;;
 esac
+fi
