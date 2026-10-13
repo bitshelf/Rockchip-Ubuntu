@@ -1,0 +1,100 @@
+--- a/gpu/ipc/service/gpu_init.cc
++++ b/gpu/ipc/service/gpu_init.cc
+@@ -479,6 +479,20 @@
+     watchdog_init.SetGpuWatchdogPtr(watchdog_thread_.get());
+   }
+ 
++#if BUILDFLAG(IS_OZONE)
++  // Initialize Ozone GPU after the watchdog in case it hangs. The sandbox
++  // may also have started at this point.
++  ui::OzonePlatform::InitParams params;
++  params.single_process = false;
++  params.enable_native_gpu_memory_buffers =
++      gpu_preferences_.enable_native_gpu_memory_buffers;
++
++#if BUILDFLAG(IS_CHROMEOS)
++  params.allow_sync_and_real_buffer_page_flip_testing = true;
++#endif  // BUILDFLAG(IS_CHROMEOS)
++  ui::OzonePlatform::InitializeForGPU(params);
++#endif  // BUILDFLAG(IS_OZONE)
++
+   bool attempted_startsandbox = false;
+ #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+   // On Chrome OS ARM Mali, GPU driver userspace creates threads when
+@@ -491,19 +505,6 @@
+   }
+ #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+ 
+-#if BUILDFLAG(IS_OZONE)
+-  // Initialize Ozone GPU after the watchdog in case it hangs. The sandbox
+-  // may also have started at this point.
+-  ui::OzonePlatform::InitParams params;
+-  params.single_process = false;
+-  params.enable_native_gpu_memory_buffers =
+-      gpu_preferences_.enable_native_gpu_memory_buffers;
+-
+-#if BUILDFLAG(IS_CHROMEOS)
+-  params.allow_sync_and_real_buffer_page_flip_testing = true;
+-#endif  // BUILDFLAG(IS_CHROMEOS)
+-  ui::OzonePlatform::InitializeForGPU(params);
+-#endif  // BUILDFLAG(IS_OZONE)
+ 
+   gl::GLDisplay* gl_display = nullptr;
+ 
+
+--- a/ui/ozone/platform/x11/ozone_platform_x11.cc
++++ b/ui/ozone/platform/x11/ozone_platform_x11.cc
+@@ -301,6 +301,10 @@
+     if (!params.single_process)
+       CreatePlatformEventSource();
+ 
++    // EGL/ANGLE uses Xlib as well as Chromium's XCB connection. Open both
++    // before an early GPU sandbox prevents socket creation and authentication.
++    x11::Connection::Get()->GetXlibDisplay();
++
+     // Set up the X11 connection before the sandbox gets set up.  This cannot be
+     // done later since opening the connection requires socket() and connect().
+     auto connection = x11::Connection::Get()->Clone();
+
+--- a/content/common/gpu_pre_sandbox_hook_linux.cc
++++ b/content/common/gpu_pre_sandbox_hook_linux.cc
+@@ -222,6 +222,9 @@
+       "/usr/lib/aarch64-linux-gnu/libEGL.so.1",
+       "/usr/lib/aarch64-linux-gnu/libEGL_mesa.so.0",
+       "/usr/lib/aarch64-linux-gnu/libGLESv2.so.2",
++      "/usr/lib/aarch64-linux-gnu/libGL.so.1",
++      "/usr/lib/aarch64-linux-gnu/libGLX.so.0",
++      "/usr/lib/aarch64-linux-gnu/libGLX_mesa.so.0",
+       "/usr/lib/aarch64-linux-gnu/libGLdispatch.so.0",
+       "/usr/lib/aarch64-linux-gnu/libgbm.so.1",
+       "/usr/lib/aarch64-linux-gnu/gbm/dri_gbm.so",
+@@ -743,6 +746,10 @@
+     dlopen("libEGL.so.1", dlopen_flag);
+     dlopen("libEGL_mesa.so.0", dlopen_flag);
+     dlopen("libGLESv2.so.2", dlopen_flag);
++    // ANGLE on X11 also resolves GLX through GLVND after sandbox startup.
++    dlopen("libGL.so.1", dlopen_flag);
++    dlopen("libGLX.so.0", dlopen_flag);
++    dlopen("libGLX_mesa.so.0", dlopen_flag);
+     dlopen("/usr/lib/aarch64-linux-gnu/gbm/dri_gbm.so", dlopen_flag);
+     dlopen("/usr/lib/aarch64-linux-gnu/dri/panfrost_dri.so", dlopen_flag);
+   }
+--- a/sandbox/policy/linux/bpf_gpu_policy_linux.cc
++++ b/sandbox/policy/linux/bpf_gpu_policy_linux.cc
+@@ -66,7 +66,16 @@
+       BoolExpr add_seals =
+           AllOf(cmd == F_ADD_SEALS, (arg & ~kAllowedMask) == 0);
+ 
++#if defined(__aarch64__) || defined(__arm__)
++      // Mesa compares already-open DRM descriptors with F_DUPFD_QUERY. It is
++      // read-only; older kernels return EINVAL. Keep other fcntl restrictions.
++      constexpr unsigned int kFDupfdQuery = 1027;
++      return If(cmd == kFDupfdQuery, Allow())
++          .Else(If(add_seals, Allow())
++                    .Else(BPFBasePolicy::EvaluateSyscall(sysno)));
++#else
+       return If(add_seals, Allow()).Else(BPFBasePolicy::EvaluateSyscall(sysno));
++#endif
+     }
+     case __NR_fdatasync:
+     case __NR_ftruncate:

@@ -16,6 +16,29 @@ if [[ -f "$PROJECT_DIR/.env" ]]; then
     source "$PROJECT_DIR/.env"
     set +a
 fi
+# Chromium's large upstream build uses the existing x86 ARM64 cross workflow.
+# Keep it behind this runtime-package entrypoint; other recipes remain native.
+if [[ "$key" == chromium ]]; then
+    [[ "$(uname -m)" == x86_64 ]] || die "Chromium cross-build requires x86_64"
+    case "${2:-}" in
+        "") (( $# == 1 )) || die "usage: $0 chromium [--package-only]"
+            "$SCRIPT_DIR/build-cross-example.sh" chromium ;;
+        --package-only)
+            (( $# == 2 )) || die "usage: $0 chromium [--package-only]"
+            # Incremental GN/Ninja compilation can reuse an existing source
+            # archive; package its staged ARM64 payload without rebuilding it.
+            : "${CHROMIUM_VERSION:?set CHROMIUM_VERSION for the staged payload}"
+            export CROSS_OUTPUT_DIR="${CROSS_OUTPUT_DIR:-$PROJECT_DIR/build/cross}"
+            "$PROJECT_DIR/package/chromium/pack-deb.sh" ;;
+        *) die "usage: $0 chromium [--package-only]" ;;
+    esac
+    chromium_publish="${CROSS_OUTPUT_DIR:-$PROJECT_DIR/build/cross}/packages/chromium"
+    chromium_sdk_output="${SDK_OUTPUT_DIR:-$(cd "$PROJECT_DIR/.." && pwd)/output}/chromium"
+    install -d "$chromium_sdk_output"
+    install -m 0644 "$chromium_publish"/chromium_*_arm64.deb "$chromium_sdk_output/"
+    install -m 0644 "$chromium_publish/SHA256SUMS" "$chromium_publish/build-info" "$chromium_sdk_output/"
+    exit 0
+fi
 case "$(uname -m)" in aarch64|arm64) ;; *) die "local runtime DEBs require a native ARM64 build host" ;; esac
 SDK_DIR="${SDK_DIR:-$(cd "$PROJECT_DIR/.." && pwd)}"
 SDK_OUTPUT_DIR="${SDK_OUTPUT_DIR:-$SDK_DIR/output}"

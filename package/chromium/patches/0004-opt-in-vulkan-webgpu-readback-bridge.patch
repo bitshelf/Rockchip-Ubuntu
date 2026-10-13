@@ -1,0 +1,49 @@
+--- a/gpu/command_buffer/service/webgpu_decoder_impl.cc
++++ b/gpu/command_buffer/service/webgpu_decoder_impl.cc
+@@ -79,6 +79,11 @@
+ 
+ namespace {
+ 
++// Opt-in bridge for Vulkan devices without GL/Vulkan external-image interop.
++// WebGPU still executes on the selected Vulkan adapter; presentation uses
++// Chromium's existing Skia upload/readback path.
++BASE_FEATURE(kWebGPUVulkanReadback, base::FEATURE_DISABLED_BY_DEFAULT);
++
+ constexpr wgpu::TextureUsage kAllowedWritableMailboxTextureUsages =
+     wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::RenderAttachment |
+     wgpu::TextureUsage::StorageBinding;
+@@ -1752,7 +1757,8 @@
+ #elif BUILDFLAG(IS_LINUX)
+       if (shared_context_state_->GrContextIsVulkan() ||
+           webgpu_on_vk_gl_interop_ ||
+-          shared_context_state_->IsGraphiteDawnVulkan()) {
++          shared_context_state_->IsGraphiteDawnVulkan() ||
++          base::FeatureList::IsEnabled(kWebGPUVulkanReadback)) {
+         backend_types = {wgpu::BackendType::Vulkan};
+       } else {
+         // Deliberately disable compat on linux.
+@@ -1816,7 +1822,12 @@
+     // SharedTextureMemory.
+     supports_external_textures = native_adapter.SupportsExternalImages();
+ #endif
+-    if (!(supports_external_textures || is_swiftshader)) {
++    const bool vulkan_readback =
++        base::FeatureList::IsEnabled(kWebGPUVulkanReadback) &&
++        adapter_info.backendType == wgpu::BackendType::Vulkan &&
++        (adapter_info.adapterType == wgpu::AdapterType::IntegratedGPU ||
++         adapter_info.adapterType == wgpu::AdapterType::DiscreteGPU);
++    if (!(supports_external_textures || is_swiftshader || vulkan_readback)) {
+       return false;
+     }
+ 
+@@ -2203,7 +2214,9 @@
+   std::unique_ptr<SharedImageRepresentationAndAccess> representation_and_access;
+   auto it = known_device_metadata_.find(device);
+   CHECK(it != known_device_metadata_.end());
+-  if (it->second.adapterType == wgpu::AdapterType::CPU) {
++  if (it->second.adapterType == wgpu::AdapterType::CPU ||
++      (base::FeatureList::IsEnabled(kWebGPUVulkanReadback) &&
++       it->second.backendType == wgpu::BackendType::Vulkan)) {
+     representation_and_access = AssociateMailboxUsingSkiaFallback(
+         mailbox, flags, device, usage, internal_usage, std::move(view_formats));
+   } else {

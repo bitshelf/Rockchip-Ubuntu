@@ -1,0 +1,21 @@
+--- a/ui/ozone/platform/x11/x11_surface_factory.cc
++++ b/ui/ozone/platform/x11/x11_surface_factory.cc
+@@ -102,6 +102,18 @@
+               static_cast<x11::Window>(window)));
+         case gl::kGLImplementationEGLANGLE:
+           DCHECK(window != gfx::kNullAcceleratedWidget);
++          // ANGLE's EGL backend uses the native EGL window directly, unlike
++          // its GLX backend. Reuse native EGL's child-window/config selection
++          // instead of requiring X11's preferred GLX visual to appear in EGL.
++          if (display->GetAs<gl::GLDisplayEGL>()->GetDisplayType() ==
++                  gl::ANGLE_OPENGLES_EGL ||
++              display->GetAs<gl::GLDisplayEGL>()->GetDisplayType() ==
++                  gl::ANGLE_OPENGL_EGL) {
++            return gl::InitializeGLSurface(
++                new gl::NativeViewGLSurfaceEGLX11GLES2(
++                    display->GetAs<gl::GLDisplayEGL>(),
++                    static_cast<x11::Window>(window)));
++          }
+           return gl::InitializeGLSurface(new gl::NativeViewGLSurfaceEGLX11(
+               display->GetAs<gl::GLDisplayEGL>(),
+               static_cast<x11::Window>(window)));
