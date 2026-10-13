@@ -4,7 +4,7 @@
 
 本页说明各功能的集成方式与验收要求，不代表所有平台或新构建镜像均已通过测试。
 实际验收结果须对应目标硬件和镜像哈希；完整门禁见
-RELEASE-GATES.md。
+[RELEASE-GATES.md](RELEASE-GATES.md)。
 
 ## GPU、Chromium 与中文输入
 
