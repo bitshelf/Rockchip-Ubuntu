@@ -37,7 +37,7 @@ declare -A CALLER_ENV=()
 for env_name in BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR BOOTFS_CONFIG \
     BOOTFS_TEMPLATE BOOTFS_OUTPUT BOOTFS_INITRD BOOTFS_SIZE_MB BOOTFS_LABEL \
     BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB BOOTFS_TIMEOUT BOOTFS_CMDLINE \
-    DTS_OVERLAY_DIR; do
+    DTS_OVERLAY_DIR BOOTFS_REQUIRE_LOGOS; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -68,7 +68,7 @@ DTS_OVERLAY_DIR="${DTS_OVERLAY_DIR:-${PROJECT_DIR}/config/dts}"
 # Values selected by the caller or .env override repository defaults.
 declare -A POLICY_ENV=()
 for env_name in BOOTFS_SIZE_MB BOOTFS_LABEL BOOTFS_BASE_DTB \
-    BOOTFS_INSTALLED_DTB BOOTFS_TIMEOUT BOOTFS_CMDLINE; do
+    BOOTFS_INSTALLED_DTB BOOTFS_TIMEOUT BOOTFS_CMDLINE BOOTFS_REQUIRE_LOGOS; do
     if [[ -v "$env_name" ]]; then
         POLICY_ENV["$env_name"]="${!env_name}"
     fi
@@ -83,6 +83,8 @@ done
 
 BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${BUILD_OUTPUT_DIR}/images/boot-${SOC_MODEL}.img}"
 BOOTFS_INITRD="${BOOTFS_INITRD:-}"
+BOOTFS_REQUIRE_LOGOS="${BOOTFS_REQUIRE_LOGOS:-0}"
+[[ "$BOOTFS_REQUIRE_LOGOS" =~ ^[01]$ ]] || die "BOOTFS_REQUIRE_LOGOS must be 0 or 1"
 
 [[ "$SOC_MODEL" =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||
     die "invalid SOC_MODEL: $SOC_MODEL"
@@ -105,7 +107,7 @@ done
     die "invalid BOOTFS_TIMEOUT: $BOOTFS_TIMEOUT"
 [[ -n "$BOOTFS_CMDLINE" && "$BOOTFS_CMDLINE" != *$'\n'* &&
    "$BOOTFS_CMDLINE" != *'|'* ]] || die "invalid BOOTFS_CMDLINE"
-for tool in awk debugfs dumpe2fs e2fsck fdtget fdtoverlay sha256sum stat; do
+for tool in awk debugfs dumpe2fs e2fsck fdtget fdtoverlay sha256sum stat python3; do
     command -v "$tool" >/dev/null || die "missing bootfs validation dependency: $tool"
 done
 
@@ -209,6 +211,16 @@ validate_bootfs() {
         esac
         (( manifest_count += 1 ))
     done <"$manifest"
+    if [[ "$BOOTFS_REQUIRE_LOGOS" == 1 ]] || grep -q '^/logos/' "$manifest"; then
+        mkdir -p "$check_dir/logos"
+        for path in logo.bmp logo_kernel.bmp; do
+            awk -F '\t' -v wanted="/logos/$path" \
+                '$1 == wanted {found=1} END {exit !found}' "$manifest" ||
+                die "logo is absent from the bootfs manifest: $path"
+            extract_image_file "$image" "/logos/$path" "$check_dir/logos/$path"
+        done
+        python3 "${SCRIPT_DIR}/check-boot-logos.py" "$check_dir/logos" --required
+    fi
     (( manifest_count >= 3 )) || die "bootfs manifest is incomplete"
     trap - RETURN
     rm -rf -- "$check_dir"
@@ -238,6 +250,9 @@ done
 [[ -s "${PLATFORM_ASSET_DIR}/boot/${BOOTFS_BASE_DTB}" ]] ||
     die "missing configured base DTB: ${PLATFORM_ASSET_DIR}/boot/${BOOTFS_BASE_DTB}"
 "${SCRIPT_DIR}/stage-sdk-assets.sh" --check
+logo_check_args=()
+[[ "$BOOTFS_REQUIRE_LOGOS" == 0 ]] || logo_check_args+=(--required)
+python3 "${SCRIPT_DIR}/check-boot-logos.py" "${PLATFORM_ASSET_DIR}/boot" "${logo_check_args[@]}"
 fdtget -l "${PLATFORM_ASSET_DIR}/boot/${BOOTFS_BASE_DTB}" / >/dev/null ||
     die "configured base DTB is invalid: $BOOTFS_BASE_DTB"
 
@@ -251,6 +266,11 @@ trap cleanup EXIT
 install -d -m 0755 "$work_dir/root/extlinux" "$work_dir/root/dtb" \
     "$work_dir/root/overlays"
 install -m 0644 "${PLATFORM_ASSET_DIR}/boot/Image" "$work_dir/root/Image"
+if [[ -f "${PLATFORM_ASSET_DIR}/boot/logo.bmp" ]]; then
+    install -d -m 0755 "$work_dir/root/logos"
+    install -m 0644 "${PLATFORM_ASSET_DIR}/boot/logo.bmp" \
+        "${PLATFORM_ASSET_DIR}/boot/logo_kernel.bmp" "$work_dir/root/logos/"
+fi
 install -m 0644 "${PLATFORM_ASSET_DIR}/boot/${BOOTFS_BASE_DTB}" \
     "$work_dir/root/dtb/${BOOTFS_INSTALLED_DTB}"
 
@@ -275,7 +295,10 @@ mapfile -d '' -t enabled_overlay_sources < <(
 declare -a enabled_overlays=()
 for source_path in "${enabled_overlay_sources[@]}"; do
     source_name="$(basename "$source_path")"
-    installed_name="${source_name%.dtso}.dtbo"
+    case "$source_name" in
+        *.dtso) installed_name="${source_name%.dtso}.dtbo" ;;
+        *.dtbo) installed_name="$source_name" ;;
+    esac
     installed_overlays["$installed_name"]="$source_path"
     compiled_overlay="$work_dir/$installed_name"
     case "$source_path" in
@@ -351,6 +374,7 @@ kernel.release=$(<"${PLATFORM_ASSET_DIR}/kernel-release")
 base.dtb=${BOOTFS_BASE_DTB}
 enabled.overlays=${enabled_overlays[*]:-}
 initrd=$([[ -n "$BOOTFS_INITRD" ]] && echo yes || echo no)
+logos.required=${BOOTFS_REQUIRE_LOGOS}
 filesystem=ext4
 filesystem.label=${BOOTFS_LABEL}
 filesystem.size_mb=${BOOTFS_SIZE_MB}
