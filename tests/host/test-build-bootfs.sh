@@ -19,6 +19,17 @@ install -d "$asset_dir/boot" \
 printf 'schema=ubuntu-platform-assets-v4\n' >"$asset_dir/.platform-asset-root"
 printf 'schema=ubuntu-platform-assets-v4\nsoc=test-soc\n' >"$asset_dir/asset-info"
 printf 'kernel\n' >"$asset_dir/boot/Image"
+python3 - "$asset_dir/boot" <<'PY'
+from pathlib import Path
+import struct
+import sys
+root = Path(sys.argv[1])
+header = struct.pack('<2sIII', b'BM', 58, 0, 54)
+header += struct.pack('<IiiHHIIiiII', 40, 1, -1, 1, 24, 0, 4, 0, 0, 0, 0)
+for name in ('logo.bmp', 'logo_kernel.bmp'):
+    (root / name).write_bytes(header + bytes([0, 0, 255, 0]))
+PY
+export BOOTFS_REQUIRE_LOGOS=1
 cp "${PROJECT_DIR}/config/kernel/overlay-root.conf" "$asset_dir/boot/kernel.config"
 printf '6.99-test\n' >"$asset_dir/kernel-release"
 printf 'module\n' \
@@ -91,6 +102,10 @@ BUILD_OUTPUT_DIR="${tmp_dir}/output" SOC_MODEL=test-soc \
 [[ -s "$output" ]] || fail "bootfs image was not created"
 [[ -s "${output}.sha256" ]] || fail "bootfs checksum was not created"
 [[ -s "${output}.build-info" ]] || fail "bootfs build evidence was not created"
+for logo in logo.bmp logo_kernel.bmp; do
+    debugfs -R "dump /logos/$logo ${tmp_dir}/$logo" "$output" >/dev/null 2>&1
+    cmp "$asset_dir/boot/$logo" "${tmp_dir}/$logo" || fail "boot logo changed during packaging"
+done
 grep -Fxq 'enabled.overlays=repository-overlay.dtbo' "${output}.build-info" ||
     fail "build evidence does not record the directory-selected overlay"
 BUILD_OUTPUT_DIR="${tmp_dir}/output" SOC_MODEL=test-soc \
@@ -127,6 +142,21 @@ debugfs -R 'stat /Image' "$output" 2>/dev/null |
 [[ "$(stat -c %a "$output")" == 644 ]] || fail "bootfs image mode is not 0644"
 dumpe2fs -h "$output" 2>/dev/null | grep -Eq '^Filesystem features:.*orphan_file' &&
     fail "bootfs enables orphan_file"
+
+# Enabled precompiled overlays keep their filename, so both their extlinux
+# reference and their manifest use the same name as the build input.
+cp "$asset_dir/boot/test-overlay.dtbo" "$overlay_dir/precompiled.dtbo"
+BUILD_OUTPUT_DIR="${tmp_dir}/output" SOC_MODEL=test-soc \
+    PLATFORM_ASSET_DIR="$asset_dir" BOOTFS_CONFIG="$config" \
+    DTS_OVERLAY_DIR="$overlay_dir" BOOTFS_OUTPUT="$output" "$BUILD_SCRIPT"
+debugfs -R "dump /extlinux/extlinux.conf ${extlinux}" "$output" >/dev/null 2>&1
+grep -Fq '/overlays/precompiled.dtbo ' "$extlinux" ||
+    fail "precompiled overlay filename changed"
+! grep -Fq '.dtbo.dtbo' "$extlinux" || fail "precompiled overlay extension duplicated"
+debugfs -R "dump /overlays/precompiled.dtbo ${tmp_dir}/precompiled.dtbo" \
+    "$output" >/dev/null 2>&1
+cmp "$overlay_dir/precompiled.dtbo" "${tmp_dir}/precompiled.dtbo" ||
+    fail "precompiled overlay payload changed"
 
 printf 'tampered\n' >>"$output"
 if BUILD_OUTPUT_DIR="${tmp_dir}/output" SOC_MODEL=test-soc \
