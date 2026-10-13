@@ -34,4 +34,22 @@ if GITHUB_OUTPUT="$output" \
     fail "corrupt rootfs passed artifact export"
 fi
 
-echo "Server rootfs artifact export checks passed"
+desktop="$images/ubuntu-test-desktop-arm64"
+for suffix in rootfs.tar.gz manifest filelist build-info qa.json; do
+    printf 'desktop %s fixture\n' "$suffix" >"${desktop}.${suffix}"
+done
+for image in "${desktop}.rootfs.tar.gz" "${desktop}.rootfs.erofs.img" "$images/boot-test.img" "$images/userdata-test.img"; do
+    [[ -f "$image" ]] || printf 'filesystem fixture\n' >"$image"
+    (cd "$images"; sha256sum "$(basename "$image")" >"$(basename "$image").sha256")
+done
+ROOTFS_VARIANT=desktop ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes GITHUB_OUTPUT="$output" \
+    "$PROJECT_DIR/scripts/export-rootfs-artifacts.sh" "$images"
+grep -Fxq "${desktop}.rootfs.erofs.img" "$output" || fail 'EROFS missing from desktop export'
+grep -Fxq "$images/boot-test.img" "$output" || fail 'boot missing from desktop export'
+grep -Fxq "$images/userdata-test.img" "$output" || fail 'userdata missing from desktop export'
+printf 'corrupt\n' >>"$images/boot-test.img"
+if ROOTFS_VARIANT=desktop ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes \
+        "$PROJECT_DIR/scripts/export-rootfs-artifacts.sh" "$images" >/dev/null 2>&1; then
+    fail 'corrupt boot image passed desktop export'
+fi
+echo "Server/Desktop rootfs and filesystem artifact export checks passed"

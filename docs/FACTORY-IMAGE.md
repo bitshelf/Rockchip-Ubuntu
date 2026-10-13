@@ -24,8 +24,11 @@ EROFS 负载大小在每次构建后才能确定：
 
 ## 使用 SDK 打包
 
-把生成的 parameter 和本批次镜像放入 SDK `output/firmware/`，然后使用 Rockchip
-原生命令：
+ARM64 Forgejo 构建并回传 rootfs 后，将 EROFS 放在
+`ubuntu/artifacts/ubuntu-rootfs.img`，让 SDK
+`rockdev/rootfs.img -> ../../ubuntu/artifacts/ubuntu-rootfs.img`。
+用 `scripts/stage-sdk-firmware.sh` 放入本批次 boot、userdata 和 parameter，
+然后使用 Rockchip 原生命令；完整流程见 [SDK 镜像流水线](SDK-IMAGE-PIPELINE.md)：
 
 ```bash
 ./build.sh edit-package-file

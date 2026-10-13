@@ -1,59 +1,47 @@
-# Forgejo/GitHub platform assets 与 ARM64 native CI
+# Forgejo/GitHub ARM64 CI 与构建资产
 
-仓库中的 Server 构建不提交 DEB、KO、DTB、DTBO、kernel Image 或 vendor blob。
-这些输入统一发布为 `platform-assets-<soc>.tar.zst` 和同名 `.sha256`，Forgejo、
-GitHub 与 ARM64 手工构建都调用同一下载/校验脚本。
+完整操作步骤见 [kernel、U-Boot、DEB、KO 上传指南](UPLOAD-ASSETS.md)，包含命令行、网页上传和发布验证。
 
-## 发布任务
+推荐流程见 [ARTIFACTS.md](ARTIFACTS.md)：所有板级选择和 KO、DEB、
+内核、DTB、updateEngine 源码输入放在 Git 忽略的 `artifacts/`。
+上传目录集合后，CI 从 `build.json` 自动读取平台信息，不需要设置 SoC、
+基础 DTB、GPU stack 等 repository variables。
 
-`.forgejo/workflows/platform-assets.yaml` 和
-`.github/workflows/platform-assets.yaml` 必须运行在能读取 Rockchip SDK 的
-self-hosted runner。配置以下 repository variables：
+命令行上传工具自动维护 `BUILD_INPUTS_URL`、`BUILD_INPUTS_SHA256`；这是
+输入包的位置和身份，不承载板级配置。Forgejo 使用 native-arm64 runner，
+GitHub 默认使用 ubuntu-24.04-arm。两者分别构建 Server 和 GNOME，输出
+rootfs 压缩包、manifest、build-info、QA、EROFS rootfs、ext4 boot/userdata
+及 SHA256。CI 附件发布 manifest、构建与 QA 记录及各文件系统镜像，
+其中 EROFS 使用稳定名称 `ubuntu-rootfs.img`；基础 tar 压缩包保留在构建输出中。
 
-- `SDK_RUNNER_LABEL`：拥有 SDK 工作树的 runner label；
-- `SDK_DIR`、`SDK_OUTPUT_DIR`、`SDK_KERNEL_CONFIG`；
-- `BUILD_OUTPUT_DIR`、`SOC_MODEL`；
-- `PLATFORM_ASSET_RELEASE_TAG`：本批不可变 Release tag。
+CI 启动菜单使用 extlinux `timeout 30`，即 3 秒。SDK U-Boot 将此值
+换算为整秒；带菜单标题时，低于 10 的值会使菜单无限等待串口输入。
+构建门禁检查 CI 生成的启动策略，实机验收还需确认无需串口选择即可启动。
 
-发布任务由 `config/local-debs/packages.conf` 与
-`config/kernel-modules/modules.conf` 选择所有允许发布的输入。Forgejo 还需 secret
-`PLATFORM_ASSET_RELEASE_TOKEN`；GitHub 使用 workflow 自带且具有 `contents: write`
-的 token。
+`BUILD_OUTPUT_DIR` 是 Forgejo 主机存储位置的可选运维配置。私有附件使用
+secret `BUILD_INPUTS_AUTH_HEADER`，不要将 token 放入仓库变量、Git、
+artifacts 清单或验收记录。根文件系统使用原生主机，不放进容器构建。
 
-每个 tag 只允许上传一次。同名资产存在时任务失败，升级或回滚通过选择另一个
-Release tag 完成，避免静默替换 CI 输入。
+## 已有 SDK 资产接口
 
-## Server 构建任务
+`scripts/stage-sdk-assets.sh` 依照模块和 DEB manifests 暂存 SDK 输出；
+`scripts/pack-platform-assets.sh`、`fetch-platform-assets.sh` 保留单平台
+资产交换接口。SDK 发布 workflow 仍适用于具有 SDK 输入的独立 runner，
+它的 SDK 路径属于 SDK 采集流程，不是新平台 rootfs CI 的配置要求。
 
-GitHub repository variables：
+`scripts/publish-platform-assets.sh` 支持 GitHub Release、Forgejo Release
+与 Forgejo Generic Package Registry。上传前验证 SHA256，Generic 上传后
+重新下载验证；同版本同名不同内容拒绝覆盖。新 rootfs CI 使用自包含的
+`ubuntu-build-inputs` 包，自动上传工具以内容摘要标识输入版本。
 
-- `ARM64_RUNNER_LABEL`：可选，默认使用 GitHub ARM64 runner；
-- `SOC_MODEL`、`BOOTFS_BASE_DTB`；
-- `PLATFORM_ASSET_BUNDLE_URL`；
-- `PLATFORM_ASSET_BUNDLE_SHA256`：建议固定，未设置时下载 `.sha256`。
+ARM64 回传的 rootfs 放到 `ubuntu/artifacts/ubuntu-rootfs.img`，
+`rockdev/rootfs.img` 指向此文件，再使用 SDK 原有打包流程。见
+[SDK-IMAGE-PIPELINE.md](SDK-IMAGE-PIPELINE.md)。
 
-私有 Release 使用 secret `PLATFORM_ASSET_AUTH_HEADER`，例如 GitHub Bearer 或
-Forgejo token 的完整 Authorization header。不要把 header 写进 repository
-variable。
+## 原生构建缓存清理
 
-Forgejo Server workflow 默认运行在 `native-arm64`，可由 runner 环境提供同一组
-变量。设置 URL 时下载 Release；不设置时验证
-`BUILD_OUTPUT_DIR/platform-assets/<soc>/` 中已有的 bundle，从而保持 209 上手工
-构建与 Forgejo runner 共享输出目录的模式。
-
-两套 Server workflow 的实际构建入口相同：
-
-```text
-source checks -> fetch/check assets -> server rootfs -> Web artifact
-```
-
-Server rootfs、SHA256、manifest、filelist、build-info 和最小 QA JSON 会上传到
-对应的 Forgejo/GitHub Actions 运行页。rootfs 本身已经是 `tar.gz`，上传步骤使用
-`compression-level: 0`，避免 ARM64 runner 重复压缩；Forgejo runner 到 209
-Forgejo 服务走局域网直传。产物保留时间沿用 Forgejo/GitHub 仓库或实例策略，
-不在 workflow 中固化。
-
-Server rootfs 仍使用 ARM64 native；Forgejo 在已迁移 OTA 输入的环境继续构建
-EROFS/bootfs。GitHub workflow 当前只构建 Server rootfs，等 OTA/updateEngine 独立
-提交并加入同一资产契约后再启用完整镜像阶段。发布 platform assets 本身可在 x86
-或 ARM64 SDK 主机执行，因为暂存和压缩不运行目标二进制。
+Forgejo 成功上传 filesystem 附件后，会校验并删除 runner 上重复保存的原始
+rootfs 镜像，保留 manifest、校验文件和构建元数据。已上传的 Actions 附件不受影响，
+后续打包应下载对应运行的附件。上传失败时不执行此清理。
+`clean-cache` 必须显式指定输出目录并设置 `CLEAN_CI_WORK=yes`；两份镜像均通过
+SHA256 校验后才删除，拒绝符号链接和校验不一致的文件。
