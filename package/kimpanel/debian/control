@@ -1,0 +1,14 @@
+Source: gnome-shell-extension-kimpanel
+Section: gnome
+Priority: optional
+Maintainer: Ubuntu image CI <root@localhost>
+Build-Depends: debhelper-compat (= 13), python3, libglib2.0-bin
+Standards-Version: 4.7.0
+Homepage: https://github.com/wengxt/gnome-shell-extension-kimpanel
+
+Package: gnome-shell-extension-kimpanel
+Architecture: all
+Depends: ${misc:Depends}, gnome-shell (>= 48), gnome-shell (<< 51)
+Description: Fcitx input method panel for GNOME Wayland
+ Provides the upstream GNOME 48, 49 and 50 Kimpanel extension, with
+ a pinned source checksum for reproducible Rockchip desktop images.

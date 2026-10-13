@@ -1,0 +1,8 @@
+# Ubuntu's default favorites include applications absent from this ARM image.
+[org.gnome.shell:ubuntu]
+favorite-apps = ['chromium.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Settings.desktop']
+enabled-extensions = ['kimpanel@kde.org']
+
+# Keep the display on when no keyboard or mouse events arrive.
+[org.gnome.desktop.session]
+idle-delay = 0

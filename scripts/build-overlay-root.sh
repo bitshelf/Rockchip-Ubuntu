@@ -49,8 +49,10 @@ esac
 declare -A CALLER_ENV=()
 for env_name in ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
     EROFS_ROOTFS_IMAGE USERDATA_IMAGE USERDATA_SIZE_MB BOOTFS_OUTPUT \
-    BOOTFS_CONFIG BOOTFS_TEMPLATE UPDATE_ENGINE_PACKAGE_DIR UPDATE_ENGINE_DEB \
-    RIME_ICE_URL RIME_ICE_ARCHIVE RIME_ICE_RESOLVED_URL; do
+    BOOTFS_CONFIG BOOTFS_TEMPLATE BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB \
+    BOOTFS_SIZE_MB BOOTFS_LABEL BOOTFS_TIMEOUT BOOTFS_CMDLINE BOOTFS_REQUIRE_LOGOS \
+    DTS_OVERLAY_DIR UPDATE_ENGINE_PACKAGE_DIR UPDATE_ENGINE_DEB \
+    RIME_ICE_URL RIME_ICE_ARCHIVE RIME_ICE_RESOLVED_URL GPU_STACK CHROMIUM_WEBGPU_BACKEND; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
     fi
@@ -76,6 +78,9 @@ SOC_MODEL="${SOC_MODEL:-}"
 PLATFORM_ASSET_DIR="${PLATFORM_ASSET_DIR:-${BUILD_OUTPUT_DIR}/platform-assets/${SOC_MODEL}}"
 IMAGES_DIR="${BUILD_OUTPUT_DIR}/images"
 USERDATA_SIZE_MB="${USERDATA_SIZE_MB:-64}"
+GPU_STACK="${GPU_STACK:-libmali}"
+[[ "$GPU_STACK" == libmali || "$GPU_STACK" == panfrost ]] ||
+    die "GPU_STACK must be libmali or panfrost"
 USERDATA_IMAGE="${USERDATA_IMAGE:-${IMAGES_DIR}/userdata-${SOC_MODEL}.img}"
 BOOTFS_OUTPUT="${BOOTFS_OUTPUT:-${IMAGES_DIR}/boot-${SOC_MODEL}.img}"
 UPDATE_ENGINE_PACKAGE_DIR="${UPDATE_ENGINE_PACKAGE_DIR:-${BUILD_OUTPUT_DIR}/packages/update-engine}"
@@ -187,6 +192,14 @@ if [[ "$EUID" -ne 0 ]]; then
         --preserve-env=BOOTFS_CONFIG \
         --preserve-env=BOOTFS_OUTPUT \
         --preserve-env=BOOTFS_TEMPLATE \
+        --preserve-env=BOOTFS_BASE_DTB \
+        --preserve-env=BOOTFS_INSTALLED_DTB \
+        --preserve-env=BOOTFS_SIZE_MB \
+        --preserve-env=BOOTFS_LABEL \
+        --preserve-env=BOOTFS_TIMEOUT \
+        --preserve-env=BOOTFS_CMDLINE \
+        --preserve-env=BOOTFS_REQUIRE_LOGOS \
+        --preserve-env=DTS_OVERLAY_DIR \
         --preserve-env=BUILD_OUTPUT_DIR \
         --preserve-env=EROFS_ROOTFS_IMAGE \
         --preserve-env=PLATFORM_ASSET_DIR \
@@ -195,6 +208,9 @@ if [[ "$EUID" -ne 0 ]]; then
         --preserve-env=USERDATA_IMAGE \
         --preserve-env=USERDATA_SIZE_MB \
         --preserve-env=RIME_ICE_URL,RIME_ICE_ARCHIVE,RIME_ICE_RESOLVED_URL \
+        --preserve-env=HTTPS_PROXY,HTTP_PROXY,NO_PROXY,https_proxy,http_proxy,no_proxy \
+        --preserve-env=GPU_STACK \
+        --preserve-env=CHROMIUM_WEBGPU_BACKEND \
         --preserve-env=ENABLE_CONSOLE_FIRSTBOOT,FIRSTBOOT_PROFILE \
         "$0" "$@"
 fi
@@ -280,13 +296,37 @@ if [[ -f "$network_seed" ]] &&
     chroot "$rootfs" systemctl enable systemd-networkd.service
 fi
 "${SCRIPT_DIR}/install-adb.sh" "$rootfs"
-"${SCRIPT_DIR}/install-libmali.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
+if [[ "$GPU_STACK" == libmali ]]; then
+    "${SCRIPT_DIR}/install-libmali.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
+else
+    for mesa_package in libegl-mesa0 libgl1-mesa-dri mesa-vulkan-drivers; do
+        # shellcheck disable=SC2016
+        chroot "$rootfs" dpkg-query -W -f='${db:Status-Status}' "$mesa_package" |
+            grep -Fxq installed || die "Panfrost Mesa package is missing: $mesa_package"
+    done
+    install -D -m 0644 "${PROJECT_DIR}/package/libmali/60-dma-heap.rules" \
+        "$rootfs/etc/udev/rules.d/60-dma-heap.rules"
+fi
 "${SCRIPT_DIR}/install-rga.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-mpp.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-local-debs.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
+if [[ -d "$PLATFORM_ASSET_DIR/iqfiles" ]]; then
+    install -d -m 0755 "$rootfs/etc/iqfiles"
+    while IFS= read -r -d '' iq_file; do
+        install -m 0644 "$iq_file" "$rootfs/etc/iqfiles/"
+    done < <(find "$PLATFORM_ASSET_DIR/iqfiles" -maxdepth 1 -type f -name '*.json' -print0)
+fi
+"${SCRIPT_DIR}/install-gnome.sh" "$rootfs"
+if [[ -x "$rootfs/usr/bin/gnome-shell" && -z "${FIRSTBOOT_PROFILE:-}" ]]; then
+    FIRSTBOOT_PROFILE=desktop
+fi
 if [[ -x "$rootfs/usr/bin/gnome-shell" ]]; then
+    # GNOME release bootfs must include both vendor boot and handoff logos.
+    export BOOTFS_REQUIRE_LOGOS="${BOOTFS_REQUIRE_LOGOS:-1}"
+    "${SCRIPT_DIR}/install-audio-customization.sh" "$rootfs"
     "${SCRIPT_DIR}/install-fcitx5-customization.sh" "$rootfs"
 fi
+
 
 module_source="${PLATFORM_ASSET_DIR}/modules/lib/modules/${kernel_release}"
 firstboot_args=("$rootfs" --profile "${FIRSTBOOT_PROFILE:-server}")
@@ -367,6 +407,7 @@ overlay.data.partlabel=userdata
 overlay.data.filesystem=ext4
 overlay.data.mount=/var/lib/overlay-root
 overlay.data.recovery-path=/userdata
+gpu.stack=${GPU_STACK}
 update-engine.version=${update_engine_version}
 update-engine.deb.sha256=${update_engine_sha256}
 kernel.release=${kernel_release}
