@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	python3 debian/prepare-extension.py
+	glib-compile-schemas extension/schemas
+
+override_dh_auto_install:
+	mkdir -p debian/tmp/usr/share/gnome-shell/extensions/kimpanel@kde.org
+	cp -a extension/. debian/tmp/usr/share/gnome-shell/extensions/kimpanel@kde.org/
+
+override_dh_auto_clean:
+	rm -rf extension
