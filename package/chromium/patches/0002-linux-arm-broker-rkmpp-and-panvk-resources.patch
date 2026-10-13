@@ -1,0 +1,75 @@
+--- a/content/common/gpu_pre_sandbox_hook_linux.cc
++++ b/content/common/gpu_pre_sandbox_hook_linux.cc
+@@ -189,6 +189,28 @@
+     permissions->push_back(
+         BrokerFilePermission::ReadWrite(kAmlogicAvcEncoderPath));
+   }
++}
++
++// RKMPP uses a userspace libv4l2 plugin and the MPP/DMA-heap devices rather
++// than kernel V4L2 decoder ioctls. Keep these additions limited to ARM builds
++// with accelerated V4L2 enabled; never grant recursive access to /dev.
++void AddRockchipV4L2Permissions(std::vector<BrokerFilePermission>* permissions) {
++  permissions->push_back(BrokerFilePermission::ReadWrite("/dev/mpp_service"));
++  permissions->push_back(BrokerFilePermission::ReadOnly("/dev/dma_heap"));
++  static const char* const kHeaps[] = {
++      "system", "system-uncached", "system-dma32", "system-uncached-dma32",
++      "cma", "cma-uncached", "cma-dma32", "cma-uncached-dma32"};
++  for (const char* heap : kHeaps) {
++    permissions->push_back(BrokerFilePermission::ReadOnly(
++        std::string("/dev/dma_heap/") + heap));
++  }
++  permissions->push_back(BrokerFilePermission::ReadOnlyRecursive(
++      "/proc/device-tree/"));
++  static const char* const kPluginPaths[] = {
++      "/usr/lib/aarch64-linux-gnu/libv4l/plugins",
++      "/usr/lib/aarch64-linux-gnu/libv4l/plugins/libv4l-rkmpp.so"};
++  for (const char* path : kPluginPaths)
++    permissions->push_back(BrokerFilePermission::ReadOnly(path));
+ }
+ 
+ void AddArmMaliGpuPermissions(std::vector<BrokerFilePermission>* permissions) {
+@@ -440,7 +462,7 @@
+ 
+   static const char* const kReadOnlyICDList[] = {
+       "intel_icd.x86_64.json", "nvidia_icd.json", "radeon_icd.x86_64.json",
+-      "mali_icd.json", "freedreno_icd.aarch64.json"};
++      "mali_icd.json", "freedreno_icd.aarch64.json", "panfrost_icd.aarch64.json"};
+ 
+   for (std::string prefix : kReadOnlyICDPrefixes) {
+     permissions->push_back(BrokerFilePermission::ReadOnly(prefix));
+@@ -590,6 +612,7 @@
+   dlopen("libvulkan_intel.so", dlopen_flag);
+   dlopen("libGLX_nvidia.so.0", dlopen_flag);
+   dlopen("libvulkan_freedreno.so", dlopen_flag);
++  dlopen("libvulkan_panfrost.so", dlopen_flag);
+ }
+ 
+ void LoadChromecastV4L2Libraries() {
+@@ -668,6 +691,13 @@
+     }
+   }
+ 
++  if (IsArchitectureArm()) {
++    AddDrmGpuPermissions(&permissions);
++    if (UseV4L2Codec(options)) {
++      AddV4L2GpuPermissions(&permissions, options);
++      AddRockchipV4L2Permissions(&permissions);
++    }
++  }
+   AddStandardGpuPermissions(&permissions);
+   return permissions;
+ }
+@@ -675,6 +705,12 @@
+ bool LoadLibrariesForGpu(
+     const sandbox::policy::SandboxSeccompBPF::Options& options) {
+   LoadVulkanLibraries();
++  if (IsArchitectureArm() && UseV4L2Codec(options)) {
++    // Resolve plugin dependencies before seccomp is installed.
++    dlopen("libv4l2.so.0", dlopen_flag);
++    dlopen("/usr/lib/aarch64-linux-gnu/libv4l/plugins/libv4l-rkmpp.so",
++           dlopen_flag);
++  }
+   if (IsArchitectureArm()) {
+     LoadArmGpuLibraries();
+   }

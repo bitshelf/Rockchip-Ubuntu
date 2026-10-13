@@ -1,0 +1,57 @@
+--- a/gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.cc
+@@ -150,7 +150,7 @@
+     }
+   }
+ 
+-  // Only supports WebGPU usages on ANGLE/GL on a Skia/GL context
++  // Supports WebGPU usages on ANGLE OpenGL/GLES on a Skia/GL context
+   if (usage.HasAny(kWebGPUUsages)) {
+ #if BUILDFLAG(USE_DAWN) && BUILDFLAG(DAWN_ENABLE_BACKEND_OPENGLES)
+ #if BUILDFLAG(USE_WEBGPU_ON_VULKAN_VIA_GL_INTEROP)
+@@ -162,7 +162,8 @@
+ #endif
+     if (gr_context_type != GrContextType::kGL ||
+         gl::GetGLImplementation() != gl::kGLImplementationEGLANGLE ||
+-        gl::GetANGLEImplementation() != gl::ANGLEImplementation::kOpenGL) {
++        (gl::GetANGLEImplementation() != gl::ANGLEImplementation::kOpenGL &&
++         gl::GetANGLEImplementation() != gl::ANGLEImplementation::kOpenGLES)) {
+       return false;
+     }
+ #else
+
+--- a/ui/ozone/platform/x11/gl_egl_utility_x11.cc
++++ b/ui/ozone/platform/x11/gl_egl_utility_x11.cc
+@@ -4,6 +4,9 @@
+ 
+ #include "ui/ozone/platform/x11/gl_egl_utility_x11.h"
+ 
++#include <utility>
++
+ #include "ui/base/x/x11_gl_egl_utility.h"
+ #include "ui/base/x/x11_util.h"
++#include "ui/gl/gl_surface_egl.h"
+ 
+@@ -20,7 +23,21 @@
+ 
+ void GLEGLUtilityX11::ChooseEGLAlphaAndBufferSize(EGLint* alpha_size,
+                                                   EGLint* buffer_size) {
+-  ChoosePlatformCustomAlphaAndBufferSize(alpha_size, buffer_size);
++  if (gl::GLSurfaceEGL::GetGLDisplayEGL()->GetNativeDisplay().GetDisplay() ==
++      EGL_DEFAULT_DISPLAY) {
++    return;
++  }
++  // EGL initialization selects this display's visual on the GPU main thread.
++  // Decoder worker contexts reuse it without opening a thread-local X11
++  // connection after the GPU sandbox has blocked new socket creation.
++  static const std::pair<EGLint, EGLint> sizes = [] {
++    EGLint alpha = 0;
++    EGLint buffer = 0;
++    ChoosePlatformCustomAlphaAndBufferSize(&alpha, &buffer);
++    return std::pair(alpha, buffer);
++  }();
++  *alpha_size = sizes.first;
++  *buffer_size = sizes.second;
+ }
+ 
+ bool GLEGLUtilityX11::HasVisualManager() {

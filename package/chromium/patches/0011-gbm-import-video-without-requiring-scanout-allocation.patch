@@ -1,0 +1,21 @@
+--- a/ui/gfx/linux/gbm_wrapper.cc
++++ b/ui/gfx/linux/gbm_wrapper.cc
+@@ -433,11 +433,16 @@
+       return nullptr;
+     }
+ 
+-    int gbm_flags = 0;
+-    if ((gbm_flags = GetSupportedGbmFlags(format)) == 0) {
++    int gbm_flags = GetSupportedGbmFlags(format);
++#if defined(MINIGBM)
++    if (gbm_flags == 0) {
+       LOG(ERROR) << "gbm format not supported: " << DrmFormatToString(format);
+       return nullptr;
+     }
++#endif
++    // Mesa can import decoder-owned video buffers without allocating or
++    // scanning them out. Let gbm_bo_import validate those handles with flags=0
++    // when the format has no scanout allocation flags on the display device.
+ 
+     struct gbm_import_fd_modifier_data fd_data;
+     fd_data.width = size.width();

@@ -52,7 +52,7 @@ grep -Fq 'target_cpu = "arm64"' \
 grep -Fq 'dpkg-deb --build' \
     "${PROJECT_DIR}/package/chromium/pack-deb.sh" ||
     fail "Chromium example does not create a DEB"
-grep -Fq 'apply_rk3576_patches' \
+grep -Fq 'apply_platform_patches' \
     "${PROJECT_DIR}/package/chromium/build-in-container.sh" ||
     fail "Chromium current-version patch hook is unavailable"
 
