@@ -51,14 +51,14 @@ Categories=Network;WebBrowser;
 EOF
 cat >"$stage/DEBIAN/control" <<EOF
 Package: chromium
-Version: ${version}-rk3576
+Version: ${version}-rockchip1
 Section: web
 Priority: optional
 Architecture: arm64
-Maintainer: RK3576 Ubuntu Builder <builder@localhost>
+Maintainer: Ubuntu Builder <builder@localhost>
 Depends: libv4l-0t64, libv4l-rkmpp1, ca-certificates, libc6, libdrm2, libgbm1, libnss3, libnspr4, libasound2t64, libatk1.0-0t64, libatk-bridge2.0-0t64, libcups2t64, libdbus-1-3, libfontconfig1, libgtk-3-0t64, libx11-6, libxcb1, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxkbcommon0, libxrandr2
-Description: Chromium browser for RK3576 (patched ARM64 build)
- Cross-built Chromium with RK3576 Wayland/V4L2 patches.
+Description: Chromium browser with MPP and hardware GPU integration
+ Cross-built ARM64 Chromium with Wayland/V4L2 integration.
 EOF
 dpkg-deb --build --root-owner-group "$stage" "$publish/chromium_${version}_arm64.deb" >/dev/null
 (cd "$publish" && sha256sum *.deb >SHA256SUMS)
