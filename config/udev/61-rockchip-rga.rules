@@ -1,0 +1,2 @@
+# RGA must be usable by the desktop account through the video group.
+SUBSYSTEM=="misc", KERNEL=="rga", GROUP="video", MODE="0660", TAG+="uaccess"

@@ -26,6 +26,7 @@ cp .env.example .env       # 按本机和平台输入修改；不要提交 .env
 ```
 
 完整文件系统合成与可烧录镜像打包见 [构建与交付流程](docs/BUILD-WORKFLOW.md)。
+桌面构建入口分别为 `./build.sh desktop` 和 `./build.sh desktop-xfce`。
 镜像默认通过首次启动创建管理员账号，不预置账号和密码，详见
 [首次启动配置](docs/UBUNTU-FIRSTBOOT.md)。
 
@@ -36,6 +37,7 @@ cp .env.example .env       # 按本机和平台输入修改；不要提交 .env
 | 主机准备、构建流程与 SDK 打包 | [构建主机](docs/ARM64-BUILD-HOST.md) · [构建与交付](docs/BUILD-WORKFLOW.md) |
 | kernel、U-Boot、DEB、KO 输入与上传 | [目录规范](docs/ARTIFACTS.md) · [上传指南](docs/UPLOAD-ASSETS.md) |
 | CI 构建与镜像发布 | [CI 与 Release](docs/CI-ASSETS.md) |
+| GNOME、XFCE 桌面配置 | [GNOME](docs/GNOME.md) · XFCE |
 | GPU、视频、摄像头、NPU、音频等功能 | [硬件功能与验收](docs/HARDWARE-FEATURES.md) |
 | image、target、reboot、soak、promotion 门禁 | [发布验收](docs/RELEASE-GATES.md) |
 | 商业使用、许可与社区协作 | [商业使用说明](docs/COMMERCIAL-USE.md) · [贡献指南](CONTRIBUTING.md) |
