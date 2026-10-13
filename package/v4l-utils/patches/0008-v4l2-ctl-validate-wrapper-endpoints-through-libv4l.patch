@@ -1,0 +1,21 @@
+From: Ubuntu Embedded Team
+Subject: [PATCH] v4l2-ctl: allow libv4l wrapper to validate virtual endpoints
+
+The Rockchip plugin uses role files, which media-info rejects before the
+wrapper is called. Keep direct device detection unchanged and retain the
+subsequent wrapper open and VIDIOC_QUERYCAP checks.
+
+--- a/utils/v4l2-ctl/v4l2-ctl.cpp
++++ b/utils/v4l2-ctl/v4l2-ctl.cpp
+@@ -1338,6 +1338,11 @@
+ 		break;
+ 	}
+ 
++	/* libv4l plugins can expose virtual endpoints backed by regular files.
++	 * In wrapper mode let open/VIDIOC_QUERYCAP validate those endpoints. */
++	if (type == MEDIA_TYPE_UNKNOWN && options[OptUseWrapper])
++		type = MEDIA_TYPE_VIDEO;
++
+ 	if (type == MEDIA_TYPE_UNKNOWN) {
+ 		fprintf(stderr, "Unable to detect what device %s is, exiting.\n",
+ 			device);

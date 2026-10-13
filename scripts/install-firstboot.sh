@@ -46,6 +46,37 @@ while IFS= read -r -d '' source; do
     install -m "$mode" "$source" "$rootfs$relative"
 done < <(find "$source_root" -type f -print0 | sort -z)
 install -d -m 0755 "$rootfs/etc/default"
+# Keep login shell defaults consistent with the firstboot administrator.
+# Preserve unrelated settings and service-account shells.
+python3 - "$rootfs" <<'PY'
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1])
+for relative, key in (("etc/default/useradd", "SHELL"),
+                      ("etc/adduser.conf", "DSHELL")):
+    path = root / relative
+    content = path.read_text() if path.exists() else ""
+    pattern = rf"(?m)^[ \t]*{key}[ \t]*=.*$"
+    setting = f"{key}=/bin/bash"
+    if re.search(pattern, content):
+        content = re.sub(pattern, setting, content)
+    else:
+        content = content.rstrip("\n") + "\n" + setting + "\n"
+    path.write_text(content)
+
+passwd = root / "etc/passwd"
+if passwd.exists():
+    entries = []
+    for line in passwd.read_text().splitlines():
+        fields = line.split(":")
+        if len(fields) == 7 and fields[0] == "root":
+            fields[6] = "/bin/bash"
+            line = ":".join(fields)
+        entries.append(line)
+    passwd.write_text("\n".join(entries) + "\n")
+PY
 cat >"$rootfs/etc/default/ubuntu-firstboot" <<EOF
 FIRSTBOOT_PROFILE=${profile}
 FIRSTBOOT_DESKTOP_AUTOLOGIN=no

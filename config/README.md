@@ -40,7 +40,7 @@ The immutable-root contract is split by responsibility:
 - `overlay-root/` owns the initramfs policy, fstab and persistent userdata
   identity. It never formats an unrecognized device during boot.
 
-`update-engine/` owns only the ARM64 Debian package metadata, reviewed source
+`../package/update-engine/` owns only the ARM64 Debian package metadata, reviewed source
 patches and Ubuntu udev compatibility links. OTA partition selection and
 packing stay with the Rockchip SDK commands.
 
@@ -48,9 +48,9 @@ packing stay with the Rockchip SDK commands.
 table. The generator inserts bootfs and rounds rootfs from actual image size;
 it does not duplicate package-file or impose product-independent min/max sizes.
 
-`rockchip-test/` defines the optional vendor test DEB and separate Server and
+`../package/rockchip-test/` defines the optional vendor test DEB and separate Server and
 Desktop QA profiles. The vendor payload itself remains an external SDK input.
 
-`adb/` owns the common USB FunctionFS gadget and service policy. adbd stays in
+`../package/adb/` owns the common USB FunctionFS gadget and service policy. adbd stays in
 the host network namespace and runs as root so ADB and serial diagnostics see
 the same board state.
