@@ -13,7 +13,7 @@ mapfile -t packages < <(
     exit 1
 }
 package="${packages[0]}"
-apt-mark showhold | grep -Fxq "$package" || {
+apt-mark showhold | grep -Fx "$package" >/dev/null || {
     echo "FAIL: libmali package is not held" >&2
     exit 1
 }
