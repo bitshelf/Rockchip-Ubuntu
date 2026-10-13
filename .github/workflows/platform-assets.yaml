@@ -21,6 +21,7 @@ jobs:
       ASSET_TAG: ${{ vars.PLATFORM_ASSET_RELEASE_TAG }}
       ASSET_TARGET_COMMIT: ${{ github.sha }}
       ASSET_TOKEN: ${{ github.token }}
+      PLATFORM_ASSET_DIR: ${{ github.workspace }}/artifacts/platform-assets/${{ vars.SOC_MODEL }}
       PLATFORM_ASSET_BUNDLE: ${{ github.workspace }}/artifacts/platform-assets-${{ vars.SOC_MODEL }}.tar.zst
 
     steps:
