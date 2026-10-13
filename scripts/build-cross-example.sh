@@ -32,7 +32,7 @@ esac
 
 declare -A CALLER_ENV=()
 for env_name in CHROMIUM_SOURCE_DIR CHROMIUM_DEPOT_TOOLS_DIR \
-    CHROMIUM_VERSION CHROMIUM_EXTRA_GN_ARGS \
+    CHROMIUM_VERSION CHROMIUM_EXTRA_GN_ARGS CHROMIUM_SOURCE_KIND CHROMIUM_PATCH_DIR \
     CROSS_BUILD_JOBS; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
@@ -114,6 +114,8 @@ info "Cross-build Chromium ARM64 payload"
 "${docker_cmd[@]}" run --rm --init --network host \
     --env "BUILD_JOBS=${jobs}" \
     --env "CHROMIUM_VERSION=${version}" \
+    --env "CHROMIUM_SOURCE_KIND=${CHROMIUM_SOURCE_KIND:-checkout}" \
+    --env HTTPS_PROXY --env HTTP_PROXY --env ALL_PROXY --env NO_PROXY \
     --env "HOST_UID=$(id -u)" --env "HOST_GID=$(id -g)" \
     --env "CHROMIUM_EXTRA_GN_ARGS=${CHROMIUM_EXTRA_GN_ARGS:-}" \
     --env "CHROMIUM_PATCH_DIR=${CHROMIUM_PATCH_DIR:-}" \

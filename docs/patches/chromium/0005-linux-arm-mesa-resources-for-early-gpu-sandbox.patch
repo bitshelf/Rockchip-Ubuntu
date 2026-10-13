@@ -1,0 +1,96 @@
+--- a/content/common/gpu_pre_sandbox_hook_linux.cc
++++ b/content/common/gpu_pre_sandbox_hook_linux.cc
+@@ -211,6 +211,35 @@
+       "/usr/lib/aarch64-linux-gnu/libv4l/plugins/libv4l-rkmpp.so"};
+   for (const char* path : kPluginPaths)
+     permissions->push_back(BrokerFilePermission::ReadOnly(path));
++}
++
++// Linux ARM Mesa needs GLVND and the multiarch DRI/GBM modules after
++// --gpu-sandbox-start-early. Keep library access specific and read-only.
++void AddArmMesaGpuPermissions(std::vector<BrokerFilePermission>* permissions) {
++  static const char* const kLibraries[] = {
++      "/proc/cpuinfo",
++      "/usr/lib/aarch64-linux-gnu/libvulkan_panfrost_experimental.so",
++      "/usr/lib/aarch64-linux-gnu/libEGL.so.1",
++      "/usr/lib/aarch64-linux-gnu/libEGL_mesa.so.0",
++      "/usr/lib/aarch64-linux-gnu/libGLESv2.so.2",
++      "/usr/lib/aarch64-linux-gnu/libGLdispatch.so.0",
++      "/usr/lib/aarch64-linux-gnu/libgbm.so.1",
++      "/usr/lib/aarch64-linux-gnu/gbm/dri_gbm.so",
++      "/usr/lib/aarch64-linux-gnu/dri/panfrost_dri.so",
++      "/usr/lib/aarch64-linux-gnu/dri/libdril_dri.so",
++      "/usr/share/glvnd/egl_vendor.d",
++      "/usr/share/glvnd/egl_vendor.d/50_mesa.json"};
++  for (const char* library : kLibraries)
++    permissions->push_back(BrokerFilePermission::ReadOnly(library));
++  // Mesa versions the Gallium filename. Discover only this library family,
++  // rather than permitting the entire multiarch library directory.
++  base::FileEnumerator libraries(
++      base::FilePath("/usr/lib/aarch64-linux-gnu"), false,
++      base::FileEnumerator::FILES, FILE_PATH_LITERAL("libgallium-*.so"));
++  for (base::FilePath library = libraries.Next(); !library.empty();
++       library = libraries.Next()) {
++    permissions->push_back(BrokerFilePermission::ReadOnly(library.value()));
++  }
+ }
+ 
+ void AddArmMaliGpuPermissions(std::vector<BrokerFilePermission>* permissions) {
+@@ -613,6 +642,7 @@
+   dlopen("libGLX_nvidia.so.0", dlopen_flag);
+   dlopen("libvulkan_freedreno.so", dlopen_flag);
+   dlopen("libvulkan_panfrost.so", dlopen_flag);
++  dlopen("libvulkan_panfrost_experimental.so", dlopen_flag);
+ }
+ 
+ void LoadChromecastV4L2Libraries() {
+@@ -632,6 +662,9 @@
+   command_set.set(sandbox::syscall_broker::COMMAND_ACCESS);
+   command_set.set(sandbox::syscall_broker::COMMAND_OPEN);
+   command_set.set(sandbox::syscall_broker::COMMAND_STAT);
++  // libdrm resolves the already permitted DRM sysfs device links on ARM.
++  if (IsArchitectureArm())
++    command_set.set(sandbox::syscall_broker::COMMAND_READLINK);
+   if (IsChromeOS() &&
+       (options.use_amd_specific_policies ||
+        options.use_intel_specific_policies ||
+@@ -692,6 +725,7 @@
+   }
+ 
+   if (IsArchitectureArm()) {
++    AddArmMesaGpuPermissions(&permissions);
+     AddDrmGpuPermissions(&permissions);
+     if (UseV4L2Codec(options)) {
+       AddV4L2GpuPermissions(&permissions, options);
+@@ -705,6 +739,13 @@
+ bool LoadLibrariesForGpu(
+     const sandbox::policy::SandboxSeccompBPF::Options& options) {
+   LoadVulkanLibraries();
++  if (IsArchitectureArm()) {
++    dlopen("libEGL.so.1", dlopen_flag);
++    dlopen("libEGL_mesa.so.0", dlopen_flag);
++    dlopen("libGLESv2.so.2", dlopen_flag);
++    dlopen("/usr/lib/aarch64-linux-gnu/gbm/dri_gbm.so", dlopen_flag);
++    dlopen("/usr/lib/aarch64-linux-gnu/dri/panfrost_dri.so", dlopen_flag);
++  }
+   if (IsArchitectureArm() && UseV4L2Codec(options)) {
+     // Resolve plugin dependencies before seccomp is installed.
+     dlopen("libv4l2.so.0", dlopen_flag);
+--- a/sandbox/policy/linux/bpf_gpu_policy_linux.cc
++++ b/sandbox/policy/linux/bpf_gpu_policy_linux.cc
+@@ -102,6 +102,15 @@
+     case __NR_sysinfo:
+     case __NR_uname:  // https://crbug.com/1075934
+       return Allow();
++#if defined(__aarch64__) || defined(__arm__)
++    case __NR_sched_setscheduler:
++    case __NR_sched_setparam:
++      // Mesa may lower another worker thread's priority after early sandbox
++      // startup. Deny non-self targets with EPERM instead of a fatal SIGSYS;
++      // this does not grant access to scheduling another process or thread.
++      return If(Arg<pid_t>(0) == 0, Allow())
++          .Else(If(Arg<pid_t>(0) == GetPolicyPid(), Allow()).Else(Error(EPERM)));
++#endif
+     case __NR_sched_setaffinity:
+       return RestrictSchedTarget(GetPolicyPid(), sysno);
+     case __NR_prlimit64:

@@ -32,40 +32,45 @@ VERSION
 export PATH="${depot_tools}:${PATH}"
 export DEPOT_TOOLS_UPDATE=0
 
-apply_rk3576_patches() {
-    local patch_dir="${CHROMIUM_PATCH_DIR:-}"
+apply_platform_patches() {
+    local patch_dir="${CHROMIUM_PATCH_DIR:-/workspace/docs/patches/chromium}"
     [[ -n "$patch_dir" ]] || return 0
-    [[ -d "$patch_dir" ]] || die "Chromium RK3576 patch directory is missing: $patch_dir"
-    [[ -s "$patch_dir/series" ]] || die "Chromium RK3576 patch series is missing: $patch_dir/series"
-    while IFS= read -r patch_name; do
-        [[ -z "$patch_name" ]] && continue
-        if git -C "$src" apply --check "$patch_dir/$patch_name" 2>/dev/null; then
-            git -C "$src" apply "$patch_dir/$patch_name"
-        elif ! git -C "$src" apply --reverse --check "$patch_dir/$patch_name" 2>/dev/null; then
-            die "Chromium patch does not apply: $patch_name"
-        fi
-    done <"$patch_dir/series"
+    [[ -d "$patch_dir" ]] || die "Chromium platform patch directory is missing: $patch_dir"
+    [[ -s "$patch_dir/series" ]] || die "Chromium platform patch series is missing: $patch_dir/series"
+    python3 /workspace/package/chromium/apply-patches.py "$src" "$patch_dir"
 }
 
 if [[ "${CHROMIUM_BUILD_PHASE:-setup}" == setup ]]; then
     [[ "$EUID" -eq 0 ]] || die "Chromium dependency setup must run as root"
     info "Install Chromium build dependencies in the ephemeral container"
+    apt-get update
+    apt-get install --yes --no-install-recommends lsb-release sudo
     "${src}/build/install-build-deps.sh" --no-prompt --no-chromeos-fonts
     exec setpriv --reuid="$host_uid" --regid="$host_gid" --clear-groups \
         env CHROMIUM_BUILD_PHASE=build \
             BUILD_JOBS="$jobs" HOST_UID="$host_uid" HOST_GID="$host_gid" \
             CHROMIUM_EXTRA_GN_ARGS="${CHROMIUM_EXTRA_GN_ARGS:-}" \
             CHROMIUM_PATCH_DIR="${CHROMIUM_PATCH_DIR:-}" \
+            CHROMIUM_SOURCE_KIND="${CHROMIUM_SOURCE_KIND:-checkout}" \
             "$0"
 fi
 [[ "$EUID" -eq "$host_uid" ]] || die "failed to drop Chromium build privileges"
-apply_rk3576_patches
+export XDG_CACHE_HOME=/out/chromium-cache
+export GOCACHE="$XDG_CACHE_HOME/go-build"
+export GOMODCACHE="$XDG_CACHE_HOME/go-mod"
+mkdir -p "$GOCACHE" "$GOMODCACHE"
+apply_platform_patches
 info "Install the upstream ARM64 sysroot and refresh pinned toolchains"
 python3 "${src}/build/linux/sysroot_scripts/install-sysroot.py" --arch=arm64
-(
-    cd /chromium
-    gclient runhooks
-)
+if [[ "${CHROMIUM_SOURCE_KIND:-checkout}" == archive ]]; then
+    # Official release archives include vendored dependencies and GN. Refresh
+    # only the pinned compilers/sysroot rather than turning the archive into a
+    # different Git checkout through gclient sync.
+    python3 "${src}/tools/clang/scripts/update.py"
+    python3 "${src}/tools/rust/update_rust.py"
+else
+    (cd /chromium && gclient runhooks)
+fi
 
 build_dir="${src}/out/arm64-cross"
 mkdir -p "$build_dir"
@@ -75,9 +80,9 @@ if [[ -n "${CHROMIUM_EXTRA_GN_ARGS:-}" ]]; then
 fi
 
 info "Generate ARM64 GN build"
-gn gen "$build_dir"
+"${src}/buildtools/linux64/gn" gen "$build_dir" --root="$src"
 info "Cross-build Chromium with ${jobs} jobs"
-autoninja -C "$build_dir" -j "$jobs" chrome chrome_sandbox chromedriver
+ninja -C "$build_dir" -j "$jobs" chrome chrome_sandbox chromedriver
 
 payload="${output}/payload/usr/lib/chromium-browser"
 rm -rf -- "$output"
@@ -106,4 +111,9 @@ while IFS= read -r elf; do
 done < <(find "${output}/payload" -type f -exec sh -c \
     'file -b "$1" | grep -q "^ELF" && printf "%s\n" "$1"' _ {} \;)
 
+{
+    printf 'source.version=%s\nsource.kind=%s\n' "$version" "${CHROMIUM_SOURCE_KIND:-checkout}"
+    [[ ! -f "$src/.source-info" ]] || cat "$src/.source-info"
+    sha256sum "$build_dir/args.gn" /workspace/docs/patches/chromium/*.patch
+} > "$output/build-info"
 echo "CHROMIUM_ARM64_PAYLOAD_OK"

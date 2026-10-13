@@ -11,11 +11,20 @@ payload="$tmp/out/chromium/payload/usr/lib/chromium-browser"
 mkdir -p "$payload"
 printf 'int main(void) { return 0; }\n' >"$tmp/main.c"
 "$cc_aarch64" "$tmp/main.c" -o "$payload/chrome"
+cp "$payload/chrome" "$payload/chrome_sandbox"
 CROSS_OUTPUT_DIR="$tmp/out" CHROMIUM_VERSION=153.0.8010.36 "$root/package/chromium/pack-deb.sh"
 deb="$tmp/out/packages/chromium/chromium_153.0.8010.36_arm64.deb"
 [[ "$(dpkg-deb -f "$deb" Architecture)" == arm64 ]]
 dpkg-deb -x "$deb" "$tmp/extract"
 readelf -h "$tmp/extract/usr/lib/chromium-browser/chrome" | grep -q AArch64
+[[ "$(stat -c %a "$tmp/extract/usr/lib/chromium-browser/chrome-sandbox")" == 4755 ]]
+dpkg-deb -c "$deb" | grep -E '^-rwsr-xr-x root/root .*chrome-sandbox$' >/dev/null
+if [[ "$(uname -m)" == x86_64 ]]; then
+    CROSS_OUTPUT_DIR="$tmp/out" SDK_OUTPUT_DIR="$tmp/sdk-output" \
+        CHROMIUM_VERSION=153.0.8010.36 \
+        "$root/scripts/build-local-debs.sh" chromium --package-only
+    cmp "$deb" "$tmp/sdk-output/chromium/$(basename "$deb")"
+fi
 # Make the fixture foreign on both x86_64 and native ARM64 hosts.  The ELF
 # e_machine field is two bytes at offset 18; EM_X86_64 is 62 (little-endian).
 cp "$payload/chrome" "$payload/foreign-helper"
