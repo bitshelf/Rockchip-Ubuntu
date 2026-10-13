@@ -39,6 +39,14 @@ bundle。需要使用不同清单时通过 `KERNEL_MODULE_CONFIG` 指定。
 `modules.builtin.modinfo` 也随 bundle 携带，供 initramfs-tools 识别内建模块；
 它们不是额外驱动集。
 
+暂存和 CI 检查还会读取每个 KO 的 ARM64 ELF `.modinfo`，要求 vermagic
+与 `kernel-release` 一致，并验证 headers DEB 中的
+`usr/src/linux-headers-<release>/include/config/kernel.release`。只改文件名、
+目录名或包的 Architecture 不能替代这些检查。内核重新配置后须重新生成模块
+和 SDK `linux-headers:aarch64` 包；使用同一次构建的最终配置和 Module.symvers。
+外部 DTB 的 `/chosen/bootargs` 也须与 bootfs policy 一致，特别是 root 文件系统
+模式和 RT CPU 隔离参数；二进制输入与板级参数仍由 `artifacts/` 提供。
+
 本地 DEB 由 `config/local-debs/packages.conf` 的 `DEB_ENTRIES` 选择。每项格式
 是“SDK `output/` 相对文件匹配式｜预期架构｜用途”。目录部分不能使用通配符，
 文件名可以匹配版本变化，但必须恰好找到一个包。暂存脚本读取 DEB control
@@ -106,6 +114,19 @@ PLATFORM_ASSET_BUNDLE_URL="https://server/owner/repo/releases/download/<tag>/pla
 `SHA256SUMS`，然后原子替换 `platform-assets/<soc>/`。
 
 ## CI 使用
+
+摄像头 IQ 数据通过 `CAMERA_IQ_DIR` 指定的绝对目录输入。stage 脚本将其中
+JSON 复制到 bundle 的 `iqfiles/` 并纳入 `SHA256SUMS`；OverlayFS 构建在安装
+相机运行包后将它们装入 `/etc/iqfiles/`。文件名须与 sensor/module/lens
+匹配，例如 `ov13855_default_default.json`。不指定时不额外安装校准数据。
+IQ 数据不放进源码仓库；借用其他模组的数据只能证明采帧链路，不能作为该
+模组图像质量已校准的依据。
+
+MYD-LR3576 CAM3 的 OV13855 overlay 保存在
+`config/dts/optional/myd-lr3576/rk3576-ov13855-cam3.dtso`。它引用 LR3576
+专有的 Jaguar 节点，不能自动应用到 JR3576 的 `myd-jr3576.dtb`。
+需要该摄像头配置时，把它复制到所选 `DTS_OVERLAY_DIR`，并在 disable-dsi
+overlay 之后应用，以重新启用摄像头使用的共享 PHY。
 
 Forgejo 和 GitHub workflow 在 rootfs 构建前执行下载或已有资产检查：
 
