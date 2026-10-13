@@ -1,0 +1,48 @@
+From: Ubuntu Embedded Team <builder@localhost>
+Subject: [PATCH] rockchip: locate early distro DTB in GPT boot partition
+
+The ext4 bootfs replaces the RKIMG resource image. Resolve the boot GPT
+partition by name before driver probing, independent of legacy boot flags.
+Enable ROCKCHIP_EARLY_DISTRO_DTB with path /dtb/board.dtb in the build config.
+
+--- a/arch/arm/mach-rockchip/boot_rkimg.c
++++ b/arch/arm/mach-rockchip/boot_rkimg.c
+@@ -434,27 +434,26 @@
+ #if defined(CONFIG_ROCKCHIP_EARLY_DISTRO_DTB)
+ static int rockchip_read_distro_dtb(void *fdt_addr)
+ {
+-	const char *cmd = "part list ${devtype} ${devnum} -bootable devplist";
+-	char *devnum, *devtype, *devplist;
++	struct blk_desc *desc;
++	disk_partition_t info;
++	int part;
++	char *devnum, *devtype;
+ 	char devnum_part[12];
+ 	char fdt_hex_str[19];
+ 	char *fs_argv[5];
+ 
+-	if (!rockchip_get_bootdev() || !fdt_addr)
++	desc = rockchip_get_bootdev();
++	if (!desc || !fdt_addr)
+ 		return -ENODEV;
+ 
+-	if (run_command_list(cmd, -1, 0)) {
+-		printf("Failed to find -bootable\n");
+-		return -EINVAL;
+-	}
+-
+-	devplist = env_get("devplist");
+-	if (!devplist)
+-		devplist = "1";
++	/* Ubuntu bootfs uses GPT name boot, without a legacy-bootable flag. */
++	part = part_get_info_by_name(desc, "boot", &info);
++	if (part < 0)
++		return part;
+ 
+ 	devtype = env_get("devtype");
+ 	devnum = env_get("devnum");
+-	sprintf(devnum_part, "%s:%s", devnum, devplist);
++	snprintf(devnum_part, sizeof(devnum_part), "%s:%x", devnum, part);
+ 	sprintf(fdt_hex_str, "0x%lx", (ulong)fdt_addr);
+ 
+ 	fs_argv[0] = "load";

@@ -15,6 +15,8 @@ for contract in 'alsactl aplay arecord amixer' 'aplay -l' 'arecord -l' \
     grep -Fq "$contract" "$PROJECT_DIR/tests/target/test-alsa-utils.sh" ||
         fail "missing ALSA CLI contract: $contract"
 done
+grep -Fq 'alsa-ucm-conf' "$PROJECT_DIR/config/ubuntu-image/resolute-server-arm64.yaml.in" ||
+    fail "alsa-ucm-conf is missing from the image definition"
 ! grep -Eq '^[[:space:]]*(speaker-test|aplay[[:space:]]+[^-]|arecord[[:space:]]+[^-])' \
     "$PROJECT_DIR/tests/target/test-alsa-utils.sh" ||
     fail "basic ALSA CLI QA must not play or record audio"

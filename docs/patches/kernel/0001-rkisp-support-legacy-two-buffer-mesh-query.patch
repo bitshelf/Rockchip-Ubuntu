@@ -1,0 +1,54 @@
+--- a/drivers/media/platform/rockchip/isp/rkisp.c
++++ b/drivers/media/platform/rockchip/isp/rkisp.c
+@@ -4521,6 +4521,17 @@
+ 	return 0;
+ }
+ 
++/* Compatibility with vendor RKAIQ built before the third mesh buffer. */
++struct rkisp_meshbuf_info_v1 {
++	__u64 module_id;
++	__u32 unite_isp_id;
++	__s32 buf_fd[2];
++	__u32 buf_size[2];
++} __packed;
++
++#define RKISP_CMD_GET_MESHBUF_INFO_V1 \
++	_IOWR('V', BASE_VIDIOC_PRIVATE + 8, struct rkisp_meshbuf_info_v1)
++
+ static long rkisp_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
+ {
+ 	struct rkisp_device *isp_dev = sd_to_isp_dev(sd);
+@@ -4622,6 +4633,21 @@
+ 		isp_dev->resmem_pa = 0;
+ 		isp_dev->resmem_size = 0;
+ 		break;
++	case RKISP_CMD_GET_MESHBUF_INFO_V1: {
++		struct rkisp_meshbuf_info_v1 *legacy = arg;
++		struct rkisp_meshbuf_info mesh_info = {
++			.module_id = legacy->module_id,
++			.unite_isp_id = legacy->unite_isp_id,
++		};
++		int i;
++
++		rkisp_params_get_meshbuf_inf(&isp_dev->params_vdev, &mesh_info);
++		for (i = 0; i < ARRAY_SIZE(legacy->buf_fd); i++) {
++			legacy->buf_fd[i] = mesh_info.buf_fd[i];
++			legacy->buf_size[i] = mesh_info.buf_size[i];
++		}
++		break;
++	}
+ 	case RKISP_CMD_GET_LDCHBUF_INFO:
+ 	case RKISP_CMD_GET_MESHBUF_INFO:
+ 		rkisp_params_get_meshbuf_inf(&isp_dev->params_vdev, arg);
+@@ -4761,6 +4787,11 @@
+ 	case RKISP_CMD_SET_LDCHBUF_SIZE:
+ 		size = sizeof(struct rkisp_ldchbuf_size);
+ 		cp_f_us = true;
++		break;
++	case RKISP_CMD_GET_MESHBUF_INFO_V1:
++		size = sizeof(struct rkisp_meshbuf_info_v1);
++		cp_f_us = true;
++		cp_t_us = true;
+ 		break;
+ 	case RKISP_CMD_GET_MESHBUF_INFO:
+ 		size = sizeof(struct rkisp_meshbuf_info);

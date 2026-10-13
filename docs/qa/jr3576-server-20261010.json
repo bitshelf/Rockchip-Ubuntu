@@ -1,0 +1,176 @@
+{
+  "schema": "jr3576-ubuntu-server-qa-v1",
+  "date": "2026-10-10",
+  "dut": "jr3576",
+  "build_host": "192.168.1.209",
+  "flash_host": "192.168.1.105",
+  "serial_port": 2002,
+  "build": {
+    "rootfs": "pass",
+    "kernel": "pass",
+    "platform_assets": "pass",
+    "overlay_root": "final_isp_abi_build_pass",
+    "host_server_tests": "pass",
+    "host_overlay_tests": "pass",
+    "rootfs_qa": {
+      "schema": "ubuntu-rootfs-qa-v1",
+      "result": "pass",
+      "variant": "server",
+      "image": "ubuntu-26.04-server-arm64.rootfs.tar.gz",
+      "sha256": "e06cdd4488e20b03953a3ca5a9e0e59c6d5fe861e544ddb01f2b64de3bee1a70",
+      "source_tree_sha256": "9ef37d412386413682d83fcb65d91504215369496a06060989cbddac0068a311",
+      "checks": [
+        "rootfs.os-release",
+        "rootfs.dpkg-status",
+        "rootfs.apt-mirror",
+        "rootfs.firstboot-no-preset-account",
+        "package.openssh-server",
+        "package.adbd",
+        "packages.forbidden-absent",
+        "packages.variant-boundary",
+        "package.server-network-stack"
+      ]
+    },
+    "firstboot_english_host": "pass",
+    "isp_host": "pass",
+    "bootfs_host": "pass",
+    "kernel_rt_stats_thread_fix": "pass_on_target",
+    "kernel_legacy_mesh_abi": "build_and_both_ioctl_queries_pass"
+  },
+  "artifacts": [
+    {
+      "partition": "boot",
+      "image": "boot-rk3576.img",
+      "sha256": "b01a62f48014721966ae04a4b6f50f52b60837aa14d6d421550db007848efcbb",
+      "size_bytes": 268435456,
+      "start_sector": 32768,
+      "capacity_sectors": 524288,
+      "command": "upgrade_tool wl 32768 /home/linaro/ubuntu-server-jr-20261010/boot-rk3576.img"
+    },
+    {
+      "partition": "rootfs",
+      "image": "ubuntu-26.04-server-arm64.rootfs.erofs.img",
+      "sha256": "3c1f7243d41da7986962bf3c127c7e052dd95a6fb9498651a08e15e8936b7006",
+      "size_bytes": 1565138944,
+      "start_sector": 884736,
+      "capacity_sectors": 7602176,
+      "command": "upgrade_tool wl 884736 /home/linaro/ubuntu-server-jr-20261010/ubuntu-26.04-server-arm64.rootfs.erofs.img"
+    },
+    {
+      "partition": "userdata",
+      "image": "userdata-rk3576.img",
+      "sha256": "3177f64059581772839e0b8cb18a4130dd2b190afcee2c28183d2fe6a27f43aa",
+      "size_bytes": 67108864,
+      "start_sector": 8486912,
+      "capacity_sectors": 52584415,
+      "command": "upgrade_tool wl 8486912 /home/linaro/ubuntu-server-jr-20261010/userdata-rk3576.img",
+      "final_revision_write": "not_written; initialized_userdata_preserved"
+    }
+  ],
+  "kernel": {
+    "release": "6.1.141",
+    "gpu_driver": "mali_bifrost",
+    "image_sha256": "37fc879a43eff6e15d125c4a9d1976a7886522ec50efdcbc6a3aeb6a335d16bd",
+    "fragment": "config/kernel/jr3576-server.config",
+    "rt_group_sched": false,
+    "runtime_build": "#3 SMP Sun Oct 11 00:16:25 CST 2026",
+    "mesh_abi_compatibility_patch": "docs/patches/kernel/0001-rkisp-support-legacy-two-buffer-mesh-query.patch",
+    "mesh_abi_patch_sha256": "016bf290bbd1881d573f0bcffa22063a111d0798e97526bd1a754e82f7c1ed7d"
+  },
+  "target": {
+    "initial_system": "Buildroot recovery",
+    "flash": "final_boot_rootfs_write_pass; userdata_preserved",
+    "hardware_qa": "12_pass_1_fail_kernel_log_guard",
+    "authorization": "boot_rootfs_userdata_reset_and_additional_uboot_authorized_by_user",
+    "boot": "extlinux_ubuntu_26.04.1_kernel_6.1.141_build_3_pass",
+    "rootfs_write": "pass",
+    "userdata_write": "pass",
+    "boot_write": "pass",
+    "readback": "rootfs full image bytes Linux SHA256 pass; uboot full Rockusb readback pass; boot payload identity pass",
+    "uboot_compatibility": {
+      "approval": "authorized_by_user_2026-10-10",
+      "build": "pass",
+      "transfer": "pass",
+      "write_and_full_readback": "pass",
+      "sha256": "a78a810e83641858bd3e1f791039af7dcb397813e6f675406fda6cc299c14bf7",
+      "backup_sha256": "536dd3e8d166bb1a3dfa158a8bc2d61ed3c66d75abf9b9ddcdb270cb95d0fd16"
+    },
+    "firstboot_english": "pass_on_target_pty",
+    "account": "qa3576",
+    "ssh_password_login": "pass_after_final_flash",
+    "persistence": "QA account and token preserved after final boot/rootfs update",
+    "rootfs_readback": "pass: 1565138944 bytes SHA256 3c1f7243d41da7986962bf3c127c7e052dd95a6fb9498651a08e15e8936b7006",
+    "userdata": {
+      "initialized": true,
+      "initial_seed_sha256": "e0f376d9065feb787b33c65b9bdb6cdd4620bb2d594cafd1be8d3121cf3d625f",
+      "expanded_size": "25.1 GiB",
+      "final_boot_rootfs_update": "preserve accounts and files"
+    },
+    "boot_full_linux_readback": "ext4 mounted rw; runtime filesystem metadata changes whole-partition hash; kernel Image matches packaged payload",
+    "tests": {
+      "firstboot": "pass",
+      "network": "pass",
+      "adb": "pass",
+      "rga": "pass",
+      "mpp": "pass",
+      "gstreamer-rkmpp": "pass",
+      "v4l2": "pass",
+      "rknpu": "pass",
+      "gpu-headless-egl": "pass",
+      "alsa-utils": "pass",
+      "update-engine": "pass",
+      "kernel-diagnostics": "pass",
+      "kernel-log-allowlist": "fail"
+    },
+    "kernel_log_findings": [
+      "ES8389 I2C/ASoC -6 register access",
+      "VOP regulator/OPP setup",
+      "duplicate Goodix driver registration",
+      "zero-size DRM reserved logo",
+      "RK806 power-off pinctrl state",
+      "VENC devfreq setup"
+    ],
+    "systemd_failed_units": 0
+  },
+  "evidence_directory": "/home/loh/rockchip/jr3576/output/ubuntu-server-jr-20261010/qa",
+  "isp": {
+    "requested_scope": "3A service startup and stability; image quality excluded by user",
+    "result": "pass",
+    "sensor": "OV13855 CSI1 I2C3 0x36",
+    "sensor_id": "OV00d855",
+    "service": "enabled and active; init/prepare/start complete",
+    "process_pid": 1196,
+    "restarts": 0,
+    "observation_seconds": 30,
+    "realtime_statistics_thread": {
+      "name": "xc:isp_3a_stats",
+      "policy": "SCHED_RR",
+      "priority": 20
+    },
+    "stream": {
+      "frames": 90,
+      "format": "NV12",
+      "width": 640,
+      "height": 480,
+      "bytes": 41472000
+    },
+    "mesh_ioctl_payload_bytes_tested": [
+      28,
+      36
+    ],
+    "iq_sha256": "bc59d80d0bf8eeddd952095e1024a83fed2c9237dac1c0c5af10228e787ff082",
+    "iq_origin": "SDK ISP39 generic defaults combined with actual OV13855 sensor register calibration; provenance camera-iq/ov13855_default_default.json.provenance",
+    "immutable_image_iq_match": true,
+    "algorithm_qa": "not_certified; no AEC/AWB schema errors seen in final stream; AIISP/BTNR warnings remain",
+    "image_quality": "not_requested",
+    "hdr": "not_tested"
+  },
+  "completed_date": "2026-10-11",
+  "result": "requested_server_and_isp_service_scope_pass_with_kernel_log_findings",
+  "limitations": [
+    "strict kernel log guard fails; audio physical playback/capture not certified",
+    "wireless, display, long-term soak and power-loss not tested",
+    "ISP production IQ/image quality/HDR not certified",
+    "gdb and strace installed on DUT userdata for diagnosis; not included in base image"
+  ]
+}

@@ -44,14 +44,14 @@ release_console() {
 
 interrupted() {
     release_console
-    printf '\n初始化尚未完成，下次启动将继续。\n'
+    printf '\nSetup is incomplete and will resume on the next boot.\n'
     exit 130
 }
 
 read_username() {
     local candidate
     while true; do
-        printf '请输入管理员用户名: ' >&2
+        printf 'Enter administrator username: ' >&2
         # Reopen the console after transient EOF. FD 0 remains on this fresh
         # descriptor so passwd reads from the same console afterwards.
         if ! exec 0<"$console_device"; then
@@ -63,11 +63,11 @@ read_username() {
             continue
         fi
         if ! valid_username "$candidate"; then
-            printf '用户名只能使用小写字母、数字、下划线和连字符。\n' >&2
+            printf 'Use lowercase letters, digits, underscores and hyphens; start with a letter or underscore.\n' >&2
             continue
         fi
         if id "$candidate" >/dev/null 2>&1; then
-            printf '用户 %s 已存在，请使用其他名称。\n' "$candidate" >&2
+            printf 'User %s already exists. Choose another username.\n' "$candidate" >&2
             continue
         fi
         username="$candidate"
@@ -96,7 +96,7 @@ ensure_user() {
     fi
     home="$(getent passwd "$selected" | cut -d: -f6)"
     [[ "$home" == /home/* ]] || {
-        printf '用户 %s 的 home 路径不安全。\n' "$selected" >&2
+        printf 'User %s has an unsafe home directory.\n' "$selected" >&2
         return 1
     }
 }
@@ -140,7 +140,7 @@ main() {
     claim_console
     trap release_console EXIT
 
-    printf '%s\n' 'Ubuntu 首次启动初始化' 'root 账户保持锁定。' ''
+    printf '%s\n' 'Ubuntu first boot setup' 'The root account remains locked.' ''
     preset="${state_dir}/preset"
     if [[ -s "$preset" ]]; then
         while IFS= read -r line; do
@@ -164,7 +164,7 @@ main() {
         state="$(head -n 1 "$pending" 2>/dev/null || true)"
         if [[ "$state" == user=* ]]; then
             username="${state#user=}"
-            valid_username "$username" || { echo '首次启动状态损坏。' >&2; exit 1; }
+            valid_username "$username" || { echo 'Invalid first boot state.' >&2; exit 1; }
             ensure_user "$username"
         else
             read_username
@@ -179,7 +179,7 @@ main() {
         rm -f "$preset"
     else
         until passwd "$username"; do
-            printf '密码设置失败，请重试。\n' >&2
+            printf 'Password setup failed. Please try again.\n' >&2
         done
     fi
     configure_desktop_autologin "$username"
@@ -197,7 +197,7 @@ main() {
     systemctl start ssh.socket 2>/dev/null || systemctl start ssh.service 2>/dev/null || true
     release_console
     trap - EXIT INT TERM HUP
-    printf '\n初始化完成。管理员用户: %s\n' "$username"
+    printf '\nSetup complete. Administrator user: %s\n' "$username"
 }
 
 [[ "${UBUNTU_FIRSTBOOT_LIBRARY_ONLY:-0}" == 1 ]] || main "$@"

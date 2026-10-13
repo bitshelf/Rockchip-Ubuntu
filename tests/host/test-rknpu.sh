@@ -45,6 +45,8 @@ grep -Fq 'DRIVERS=="rknpu"' \
 grep -Fq 'GROUP="render", MODE="0660"' \
     "$PROJECT_DIR/package/rknpu2/debian/60-rockchip-rknpu.rules" ||
     fail "RKNPU render-group access is missing"
+grep -Fq 'both render and video' "$PROJECT_DIR/tests/target/test-rknpu.sh" ||
+    fail "DRM RKNPU QA does not enforce both device-access groups"
 bash -n "$PROJECT_DIR/tests/target/test-rknpu.sh" \
     "$PROJECT_DIR/package/rknpu2/debian/install-blobs.sh"
 
