@@ -1,0 +1,23 @@
+Subject: [PATCH] drm/panfrost: enable MMU interrupts during device initialization
+
+Backport the init-time interrupt enablement from Adrián Larumbe's upstream
+"drm/panfrost: Explicitly enable MMU interrupts at device init" to BSP 6.1.
+Upstream: https://lore.gitlab.freedesktop.org/drm-ai-reviews/20260604-claude-fixes-v2-7-57c6bd4c1655@collabora.com/
+
+Panfrost starts runtime-active. Its initial MMU setup only registers the
+interrupt handler; the mask is enabled on reset/resume. With autosuspend
+disabled, the first tiler-heap page fault is never serviced and the first
+GNOME vertex/tiler job times out. Enable interrupts before accepting jobs.
+
+--- a/drivers/gpu/drm/panfrost/panfrost_mmu.c
++++ b/drivers/gpu/drm/panfrost/panfrost_mmu.c
+@@ -768,6 +768,9 @@ int panfrost_mmu_init(struct panfrost_device *pfdev)
+ 		return err;
+ 	}
+ 
++	mmu_write(pfdev, MMU_INT_CLEAR, ~0);
++	mmu_write(pfdev, MMU_INT_MASK, ~0);
++
+ 	return 0;
+ }
+ 

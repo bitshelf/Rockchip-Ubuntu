@@ -1,0 +1,15 @@
+--- a/drivers/gpu/drm/panfrost/panfrost_drv.c
++++ b/drivers/gpu/drm/panfrost/panfrost_drv.c
+@@ -592,6 +592,12 @@
+ 	}
+ 
+ 	pm_runtime_set_active(pfdev->dev);
++	/* RK3576 vendor genpd cannot yet restore the Panfrost clock/idle
++	 * sequence. Keep the GPU powered while that integration is qualified.
++	 */
++	if (of_property_read_bool(pdev->dev.of_node,
++				  "rockchip,panfrost-disable-runtime-pm"))
++		pm_runtime_forbid(pfdev->dev);
+ 	pm_runtime_mark_last_busy(pfdev->dev);
+ 	pm_runtime_enable(pfdev->dev);
+ 	pm_runtime_set_autosuspend_delay(pfdev->dev, 50); /* ~3 frames */
