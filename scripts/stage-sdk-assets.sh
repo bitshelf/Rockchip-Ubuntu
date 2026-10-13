@@ -143,6 +143,7 @@ validate_bundle() {
     done
     "${PROJECT_DIR}/scripts/check-kernel-config.sh" \
         "${root}/boot/kernel.config" "$KERNEL_CONFIG_REQUIREMENTS" >/dev/null
+    python3 "${PROJECT_DIR}/scripts/check-boot-logos.py" "${root}/boot"
     local module_source module_target autoload module_count=0
     while IFS=$'\t' read -r module_source module_target autoload; do
         [[ "$module_source" != /* && "$module_source" != *..* &&
@@ -198,6 +199,7 @@ stage_bundle() {
     local -a deb_matches=()
 
     source_boot="${SDK_OUTPUT_DIR}/extlinux"
+    python3 "${PROJECT_DIR}/scripts/check-boot-logos.py" "$source_boot"
     source_modules="${SDK_OUTPUT_DIR}/kernel-modules/lib/modules"
     [[ -s "${source_boot}/Image" ]] ||
         die "missing SDK kernel image: ${source_boot}/Image"
@@ -254,6 +256,10 @@ stage_bundle() {
     install -d -m 0755 "$stage/boot" "$stage/modules/lib/modules" \
         "$stage/debs"
     install -m 0644 "${source_boot}/Image" "$stage/boot/Image"
+    if [[ -f "${source_boot}/logo.bmp" ]]; then
+        install -m 0644 "${source_boot}/logo.bmp" \
+            "${source_boot}/logo_kernel.bmp" "$stage/boot/"
+    fi
     install -m 0644 "${dt_inputs[@]}" "$stage/boot/"
     install -m 0644 "$SDK_KERNEL_CONFIG" "$stage/boot/kernel.config"
     if [[ -s "${source_boot}/extlinux.conf" ]]; then
