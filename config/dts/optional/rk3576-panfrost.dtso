@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/dts-v1/;
+/plugin/;
+
+/* Panfrost does not implement the vendor PVTM/binning and SRAM margin
+ * transitions. Use the vendor's lowest frequency and low-temperature voltage
+ * floor until that DVFS integration is implemented and qualified.
+ */
+/ {
+    fragment@10 {
+        target-path = "/";
+        __overlay__ {
+            panfrost_safe_opp: panfrost-safe-opp-table {
+                compatible = "operating-points-v2";
+                opp-300000000 {
+                    opp-hz = /bits/ 64 <300000000>;
+                    opp-microvolt = <750000>;
+                };
+            };
+        };
+    };
+};
+
+/* Use with the Panfrost kernel/userspace product only. Vendor Mali uses
+ * uppercase IRQ names and different clock aliases for the same resources.
+ */
+&gpu {
+    interrupt-names = "gpu", "mmu", "job";
+    clock-names = "core", "bus";
+    operating-points-v2 = <&panfrost_safe_opp>;
+    rockchip,panfrost-disable-runtime-pm;
+};
