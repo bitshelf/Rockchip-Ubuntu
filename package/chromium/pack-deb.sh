@@ -22,9 +22,24 @@ done < <(find "$payload" -type f -print0)
 rm -rf -- "$stage" "$publish"
 install -d "$stage/DEBIAN" "$stage/usr/bin" "$stage/usr/share/applications" "$publish"
 cp -a "$payload/usr" "$stage/"
+[[ -f "$stage/usr/lib/chromium-browser/chrome_sandbox" ]] || die "missing sandbox helper"
+mv "$stage/usr/lib/chromium-browser/chrome_sandbox" "$stage/usr/lib/chromium-browser/chrome-sandbox"
+chmod 4755 "$stage/usr/lib/chromium-browser/chrome-sandbox"
 cat >"$stage/usr/bin/chromium" <<'EOF'
 #!/bin/sh
-exec /usr/lib/chromium-browser/chrome "$@"
+# The image chooses its GPU policy; explicit caller adapter selection wins.
+rockchip_adapter_explicit=0
+for rockchip_arg do
+    case "$rockchip_arg" in --use-webgpu-adapter=*) rockchip_adapter_explicit=1 ;; esac
+done
+rockchip_backend=
+if [ -r /etc/chromium/rockchip-webgpu-backend ]; then
+    IFS= read -r rockchip_backend </etc/chromium/rockchip-webgpu-backend || :
+fi
+if [ "$rockchip_adapter_explicit" = 0 ] && [ "$rockchip_backend" = gles-compat ]; then
+    set -- --use-angle=gl --use-webgpu-adapter=opengles --force-webgpu-compat --disable-features=Vulkan "$@"
+fi
+exec /usr/lib/chromium-browser/chrome --gpu-sandbox-start-early --enable-features=AcceleratedVideoDecoder,PreferV4L2VideoAcceleration "$@"
 EOF
 chmod 0755 "$stage/usr/bin/chromium"
 cat >"$stage/usr/share/applications/chromium.desktop" <<'EOF'
@@ -41,11 +56,12 @@ Section: web
 Priority: optional
 Architecture: arm64
 Maintainer: RK3576 Ubuntu Builder <builder@localhost>
-Depends: ca-certificates, libc6, libdrm2, libgbm1, libnss3, libx11-6, libxcb1, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxkbcommon0, libxrandr2
+Depends: libv4l-0t64, libv4l-rkmpp1, ca-certificates, libc6, libdrm2, libgbm1, libnss3, libnspr4, libasound2t64, libatk1.0-0t64, libatk-bridge2.0-0t64, libcups2t64, libdbus-1-3, libfontconfig1, libgtk-3-0t64, libx11-6, libxcb1, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxkbcommon0, libxrandr2
 Description: Chromium browser for RK3576 (patched ARM64 build)
  Cross-built Chromium with RK3576 Wayland/V4L2 patches.
 EOF
 dpkg-deb --build --root-owner-group "$stage" "$publish/chromium_${version}_arm64.deb" >/dev/null
 (cd "$publish" && sha256sum *.deb >SHA256SUMS)
 printf 'source.version=%s\nformat=deb\narchitecture=arm64\n' "$version" >"$publish/build-info"
+[[ ! -f "$output_root/chromium/build-info" ]] || cat "$output_root/chromium/build-info" >> "$publish/build-info"
 echo "CHROMIUM_ARM64_DEB_OK"
