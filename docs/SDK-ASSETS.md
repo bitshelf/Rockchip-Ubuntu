@@ -122,11 +122,8 @@ JSON 复制到 bundle 的 `iqfiles/` 并纳入 `SHA256SUMS`；OverlayFS 构建�
 IQ 数据不放进源码仓库；借用其他模组的数据只能证明采帧链路，不能作为该
 模组图像质量已校准的依据。
 
-MYD-LR3576 CAM3 的 OV13855 overlay 保存在
-`config/dts/optional/myd-lr3576/rk3576-ov13855-cam3.dtso`。它引用 LR3576
-专有的 Jaguar 节点，不能自动应用到 JR3576 的 `myd-jr3576.dtb`。
-需要该摄像头配置时，把它复制到所选 `DTS_OVERLAY_DIR`，并在 disable-dsi
-overlay 之后应用，以重新启用摄像头使用的共享 PHY。
+产品专用的摄像头 overlay 由 SDK 或外部资产包提供，不放进 Ubuntu
+源码仓库。选择与基础 DTB 配套的 DTBO，并通过 `DTS_OVERLAY_DIR` 显式启用。
 
 Forgejo 和 GitHub workflow 在 rootfs 构建前执行下载或已有资产检查：
 
