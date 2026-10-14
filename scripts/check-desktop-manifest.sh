@@ -4,15 +4,20 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 variant="${1:-}" manifest="${2:-}"
 [[ -s "$manifest" ]] || { echo 'ERROR: package manifest is missing' >&2; exit 1; }
 case "$variant" in
-    desktop)
+    desktop|desktop-xfce)
         while read -r package rest; do
             [[ -n "$package" && "$package" != \#* ]] || continue
             awk -v p="$package" '$1 == p || $1 == p ":arm64" {found=1} END {exit !found}' "$manifest" || {
-                echo "ERROR: GNOME package missing: $package" >&2; exit 1;
+                echo "ERROR: ${variant} package missing: $package" >&2; exit 1;
             }
-        done <"$PROJECT_DIR/config/ubuntu-image/desktop.packages"
-        ! awk '{print $1}' "$manifest" | grep -E '^(xfce4|xfwm4|lightdm|weston)([-:]|$)' || {
-            echo 'ERROR: another desktop stack leaked into GNOME' >&2; exit 1;
+        done <"$PROJECT_DIR/config/ubuntu-image/${variant}.packages"
+        if [[ "$variant" == desktop-xfce ]]; then
+            forbidden='^(gnome-shell|gdm3|ubuntu-session|weston)([-:]|$)'
+        else
+            forbidden='^(xfce4|xfwm4|lightdm|weston)([-:]|$)'
+        fi
+        ! awk '{print $1}'  "$manifest" | grep -E "$forbidden" || {
+            echo "ERROR: another desktop stack leaked into $variant" >&2; exit 1;
         }
         ;;
     server)

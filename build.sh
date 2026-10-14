@@ -11,6 +11,7 @@ usage: ./build.sh server [--check]
   server --check  validate configuration and host prerequisites only
   desktop         build the Ubuntu 26 GNOME ARM64 rootfs
   desktop --check validate GNOME configuration and host prerequisites only
+  desktop-xfce    build the Ubuntu 26 XFCE/Xserver ARM64 rootfs
   bootfs          build an independent ext4 boot filesystem
   bootfs --check  validate an existing bootfs image without mounting it
   overlay-root          build EROFS lower, userdata and OverlayFS initramfs
@@ -51,6 +52,10 @@ case "${1:-}" in
     desktop)
         shift
         exec "${PROJECT_DIR}/scripts/build-server.sh" --variant desktop "$@"
+        ;;
+    desktop-xfce)
+        shift
+        exec "${PROJECT_DIR}/scripts/build-server.sh" --variant desktop-xfce "$@"
         ;;
     bootfs)
         shift
