@@ -323,11 +323,15 @@ if [[ -d "$PLATFORM_ASSET_DIR/iqfiles" ]]; then
     done < <(find "$PLATFORM_ASSET_DIR/iqfiles" -maxdepth 1 -type f -name '*.json' -print0)
 fi
 "${SCRIPT_DIR}/install-gnome.sh" "$rootfs"
+"${SCRIPT_DIR}/install-xfce.sh" "$rootfs"
 if [[ -x "$rootfs/usr/bin/gnome-shell" && -z "${FIRSTBOOT_PROFILE:-}" ]]; then
     FIRSTBOOT_PROFILE=desktop
 fi
-if [[ -x "$rootfs/usr/bin/gnome-shell" ]]; then
-    # GNOME release bootfs must include both vendor boot and handoff logos.
+if [[ -x "$rootfs/usr/bin/xfce4-session" && -z "${FIRSTBOOT_PROFILE:-}" ]]; then
+    FIRSTBOOT_PROFILE=desktop-xfce
+fi
+if [[ -x "$rootfs/usr/bin/gnome-shell" || -x "$rootfs/usr/bin/xfce4-session" ]]; then
+    # Desktop release bootfs must include both vendor boot and handoff logos.
     export BOOTFS_REQUIRE_LOGOS="${BOOTFS_REQUIRE_LOGOS:-1}"
     "${SCRIPT_DIR}/install-audio-customization.sh" "$rootfs"
     "${SCRIPT_DIR}/install-fcitx5-customization.sh" "$rootfs"

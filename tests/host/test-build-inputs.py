@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as tmp:
         for name in ('update-engine.tar', 'update-engine.tar.source-info'):
             (root / 'sources' / name).write_bytes(b'fixture')
         data = {'schema': 'ubuntu-build-inputs-v1', 'soc': soc, 'gpu_stack': 'panfrost',
-                'variants': ['server', 'desktop'], 'boot': {'base_dtb': 'board.dtb'}}
+                'variants': ['server', 'desktop', 'desktop-xfce'], 'boot': {'base_dtb': 'board.dtb'}}
         (root / 'build.json').write_text(json.dumps(data))
         # Published files must never be sent back as build inputs.
         (root / 'ubuntu-rootfs.img').write_bytes(b'not-an-input')
@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 return real_run(*args, **kwargs)
         module.run = fixture_run
         try:
-            module.build(dest, output, 'desktop')
+            module.build(dest, output, 'desktop-xfce')
         finally:
             module.run = real_run
         timeout = int(subprocess.check_output(

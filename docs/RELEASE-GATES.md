@@ -6,7 +6,7 @@ zero and `promoted: true` require all five gates; incomplete evidence produces
 exit code one and a reason. A successful host fixture is not board acceptance.
 
 The candidate uses schema `ubuntu-candidate-v1`, product
-`ubuntu26-gnome` or `ubuntu26-server`, the intended hardware `serial`,
+`ubuntu26-gnome`, `ubuntu26-xfce` or `ubuntu26-server`, the intended hardware `serial`,
 `kernel_release`, and an `artifacts` object. Required keys are
 `boot`, `rootfs`, `userdata`, `uboot`, `kernel`, `initrd`, `dtb`, `modules`, and
 `source-manifest`. Each file record contains a relative `path` and its
@@ -14,7 +14,7 @@ The candidate uses schema `ubuntu-candidate-v1`, product
 commits, dirty patches, build configuration, and platform asset checksums.
 Symlinks, directory escapes, missing files, and checksum changes fail.
 
-The immutable GNOME candidate must also declare `webgpu_backend`: `vulkan-core` or
+The immutable desktop candidate must also declare `webgpu_backend`: `vulkan-core` or
 `gles-compat`. The `webgpu-hardware` target check records the matching `backend`,
 `feature_level` (`core` or `compatibility`), `fallback_adapter: false`,
 `render_readback: true` and `compute_values_checked: 256`. Promotion exports
@@ -77,7 +77,9 @@ Host verification: `python3 tests/host/test-release-gates.py` checks a
 synthetic complete fixture and rejects missing, stale, altered, unrelated,
 uncontrolled, and insufficient-duration evidence. Real GNOME promotion is
 pending until the current candidate completes every target gate. XFCE work
-follows that acceptance and requires its own product-specific gate policy.
+follows GNOME acceptance. Its policy replaces the GNOME session check with
+`xfce-xserver` and retains real video, WebGPU, Rime and all other hardware
+checks; Server evidence cannot stand in for either desktop.
 
 ## Reusable mixed soak runner
 
@@ -96,7 +98,8 @@ python3 tests/target/test-mixed-soak.py \
   --npu-qa-mode functional --seconds 3605
 ```
 
-Use `--mode server` for the hardware MPP encode/decode pipeline instead of
+Use `--mode desktop-xfce` for native Xserver Chromium and XFCE session
+checks, with the selected user's Xauthority cookie. Use `--mode server` for the hardware MPP encode/decode pipeline instead of
 the headed Chromium movie. `--user` and `--video` are required for desktop;
 the supplied desktop user must be unprivileged. The default NPU mode is
 `latency` and retains the 15 ms ceiling. Select `functional` only when

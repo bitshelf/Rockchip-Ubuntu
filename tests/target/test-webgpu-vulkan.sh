@@ -17,7 +17,11 @@ grep -Fxq 'CONFIG_ARM64_VA_BITS_48=y' <<<"$kernel_options" ||
 display_args=(--ozone-platform=wayland)
 if [[ "${CHROMIUM_QA_HEADLESS:-0}" == 1 ]]; then
     display_args=(--headless=new --ozone-platform=headless --window-size=1280,720)
+elif [[ "${CHROMIUM_QA_SESSION:-wayland}" == x11 ]]; then
+    [[ -n "${DISPLAY:-}" ]] || fail 'Xserver DISPLAY is missing'
+    display_args=(--ozone-platform=x11)
 else
+    [[ "${CHROMIUM_QA_SESSION:-wayland}" == wayland ]] || fail 'invalid CHROMIUM_QA_SESSION'
     [[ -n "${WAYLAND_DISPLAY:-}" && -n "${XDG_RUNTIME_DIR:-}" ]] || fail 'run as the GNOME Wayland user, or explicitly set CHROMIUM_QA_HEADLESS=1'
 fi
 backend="${WEBGPU_BACKEND:-vulkan}"
