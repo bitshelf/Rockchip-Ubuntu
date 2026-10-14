@@ -124,3 +124,6 @@ Rockchip U-Boot 2017.09 的 extlinux 启动接入、FDT overlay 回移、RKIMG �
 Server、GNOME 和 XFCE 的默认登录 shell 为 `/bin/bash`；首启管理员、root
 以及通过 `useradd`、`adduser` 新建的普通用户均采用 Bash。
 `/bin/sh` 保留 Ubuntu 的系统脚本解释器配置。
+
+XFCE/Xserver is built with `./build.sh desktop-xfce`; its image inputs,
+firstboot policy and acceptance are described in [docs/XFCE.md](XFCE.md).

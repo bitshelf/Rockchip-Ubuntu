@@ -89,6 +89,18 @@ class GatesTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.validate()
 
+    def test_xfce_requires_physical_xserver_evidence(self):
+        self.candidate["product"] = "ubuntu26-xfce"
+        self.evidence["candidate_sha256"] = hashlib.sha256(json.dumps(
+            self.candidate, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        with self.assertRaises(ValueError):
+            self.validate()
+        self.evidence["target"]["xfce-xserver"] = self.evidence["target"].pop("gnome")
+        self.assertEqual(self.validate()["product"], "ubuntu26-xfce")
+        self.evidence["target"]["xfce-xserver"]["actual_hardware"] = False
+        with self.assertRaises(ValueError):
+            self.validate()
+
     def test_target_identity_comes_from_candidate(self):
         self.candidate["serial"] = "replacement-board"
         self.evidence["serial"] = "replacement-board"

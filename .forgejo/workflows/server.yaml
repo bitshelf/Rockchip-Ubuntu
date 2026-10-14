@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [server, desktop]
+        variant: [server, desktop, desktop-xfce]
     env:
       CLEAN_CI_WORK: yes
       BUILD_OUTPUT_DIR: ${{ vars.BUILD_OUTPUT_DIR || '/var/lib/overlay-root/ubuntu-ci/build' }}/${{ matrix.variant }}

@@ -9,7 +9,7 @@
 
 命令行上传工具自动维护 `BUILD_INPUTS_URL`、`BUILD_INPUTS_SHA256`；这是
 输入包的位置和身份，不承载板级配置。Forgejo 使用 native-arm64 runner，
-GitHub 默认使用 ubuntu-24.04-arm。两者分别构建 Server 和 GNOME，输出
+GitHub 默认使用 ubuntu-24.04-arm。两者分别构建 Server、GNOME 和 XFCE，输出
 rootfs 压缩包、manifest、build-info、QA、EROFS rootfs、ext4 boot/userdata
 及 SHA256。CI 附件发布 manifest、构建与 QA 记录及各文件系统镜像，
 其中 EROFS 使用稳定名称 `ubuntu-rootfs.img`；基础 tar 压缩包保留在构建输出中。

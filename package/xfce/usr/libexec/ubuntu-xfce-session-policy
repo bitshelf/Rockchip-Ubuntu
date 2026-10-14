@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ -n "${DISPLAY:-}" ]] || exit 0
+xset s off
+xset -dpms
+# Xfce's power manager must retain the Xserver policy after it starts.
+for setting in 'dpms-enabled|bool|false' 'blank-on-ac|uint|0' 'blank-on-battery|uint|0'; do
+    IFS='|' read -r name type value <<<"$setting"
+    property="/xfce4-power-manager/$name"
+    xfconf-query -c xfce4-power-manager -p "$property" -s "$value" 2>/dev/null ||
+        xfconf-query -c xfce4-power-manager -p "$property" -n -t "$type" -s "$value"
+done
