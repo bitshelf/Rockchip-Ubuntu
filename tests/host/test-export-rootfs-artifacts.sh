@@ -47,6 +47,16 @@ ROOTFS_VARIANT=desktop ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes GITHUB_OUTPUT="$outp
 grep -Fxq "${desktop}.rootfs.erofs.img" "$output" || fail 'EROFS missing from desktop export'
 grep -Fxq "$images/boot-test.img" "$output" || fail 'boot missing from desktop export'
 grep -Fxq "$images/userdata-test.img" "$output" || fail 'userdata missing from desktop export'
+xfce="$images/ubuntu-test-desktop-xfce-arm64"
+for suffix in rootfs.tar.gz manifest filelist build-info qa.json rootfs.erofs.img; do
+    printf 'XFCE fixture\n' >"${xfce}.${suffix}"
+done
+for image in "${xfce}.rootfs.tar.gz" "${xfce}.rootfs.erofs.img"; do
+    (cd "$images"; sha256sum "$(basename "$image")" >"$(basename "$image").sha256")
+done
+ROOTFS_VARIANT=desktop-xfce ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes GITHUB_OUTPUT="$output" \
+    "$PROJECT_DIR/scripts/export-rootfs-artifacts.sh" "$images"
+grep -Fxq "${xfce}.rootfs.erofs.img" "$output" || fail 'XFCE export selected another desktop'
 printf 'corrupt\n' >>"$images/boot-test.img"
 if ROOTFS_VARIANT=desktop ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes \
         "$PROJECT_DIR/scripts/export-rootfs-artifacts.sh" "$images" >/dev/null 2>&1; then

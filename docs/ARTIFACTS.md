@@ -30,7 +30,7 @@ artifacts/
 {
   "schema": "ubuntu-build-inputs-v1",
   "soc": "rk3588",
-  "variants": ["server", "desktop"],
+  "variants": ["server", "desktop", "desktop-xfce"],
   "gpu_stack": "panfrost",
   "chromium_webgpu_backend": "auto",
   "boot": {

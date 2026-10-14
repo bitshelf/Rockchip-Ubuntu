@@ -17,8 +17,11 @@ SERVER_TARGET_CHECKS = {"firstboot", "network", "gpu-egl", "rknpu", "rkmpp",
                         "rga", "isp-3a", "audio-playback-capture",
                         "kernel-log-allowlist", "pstore-panic",
                         "watchdog-expiry", "rt-cyclictest"}
+XFCE_TARGET_CHECKS = (TARGET_CHECKS - {"gnome"}) | {"xfce-xserver"}
+DESKTOP_PRODUCTS = {"ubuntu26-gnome", "ubuntu26-xfce"}
 PRODUCT_POLICIES = {"ubuntu26-gnome": TARGET_CHECKS,
-                    "ubuntu26-server": SERVER_TARGET_CHECKS}
+                    "ubuntu26-server": SERVER_TARGET_CHECKS,
+                    "ubuntu26-xfce": XFCE_TARGET_CHECKS}
 ARTIFACTS = {"boot", "rootfs", "userdata", "uboot", "kernel",
              "initrd", "dtb", "modules", "source-manifest"}
 UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\Z")
@@ -72,7 +75,7 @@ def validate(candidate, evidence, candidate_base, evidence_base):
     require(evidence.get("kernel_release") == candidate.get("kernel_release")
             and bool(candidate.get("kernel_release")), "kernel mismatch")
     webgpu_backend = candidate.get("webgpu_backend")
-    if product == "ubuntu26-gnome":
+    if product in DESKTOP_PRODUCTS:
         require(webgpu_backend in {"vulkan-core", "gles-compat"},
                 "candidate must declare its WebGPU hardware capability")
     else:
@@ -88,7 +91,7 @@ def validate(candidate, evidence, candidate_base, evidence_base):
                 require(UUID.fullmatch(check.get("boot_id", "")), f"missing boot ID: {name}")
                 require(check.get("actual_hardware") is True, f"hardware proof absent: {name}")
     expected_level = None
-    if product == "ubuntu26-gnome":
+    if product in DESKTOP_PRODUCTS:
         webgpu = evidence["target"]["webgpu-hardware"]
         require(webgpu.get("backend") == webgpu_backend, "WebGPU backend differs from candidate")
         expected_level = "core" if webgpu_backend == "vulkan-core" else "compatibility"

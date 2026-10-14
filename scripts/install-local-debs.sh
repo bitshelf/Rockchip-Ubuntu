@@ -18,13 +18,20 @@ declare -p LOCAL_DEB_INSTALL_PURPOSES LOCAL_DEB_HOLD_PURPOSES \
     LOCAL_DEB_DISABLE_SERVICES LOCAL_DEB_REQUIRED_ENTRIES >/dev/null 2>&1 ||
     die "incomplete local DEB install config"
 
-for optional_array in LOCAL_DEB_DESKTOP_INSTALL_PURPOSES \
+for optional_array in LOCAL_DEB_XFCE_FILE_ENTRIES LOCAL_DEB_XFCE_REQUIRED_ENTRIES \
+        LOCAL_DEB_DESKTOP_INSTALL_PURPOSES \
         LOCAL_DEB_DESKTOP_OPTIONAL_INSTALL_PURPOSES \
         LOCAL_DEB_DESKTOP_HOLD_PURPOSES LOCAL_DEB_DESKTOP_FILE_ENTRIES \
         LOCAL_DEB_DESKTOP_REQUIRED_ENTRIES; do
     declare -p "$optional_array" >/dev/null 2>&1 || declare -a "$optional_array=()"
 done
-if [[ -x "$rootfs/usr/bin/gnome-shell" ]]; then
+if [[ -x "$rootfs/usr/bin/gnome-shell" || -x "$rootfs/usr/bin/xfce4-session" ]]; then
+    if [[ ! -x "$rootfs/usr/bin/gnome-shell" ]]; then
+        LOCAL_DEB_DESKTOP_INSTALL_PURPOSES=(chromium-runtime)
+        LOCAL_DEB_DESKTOP_HOLD_PURPOSES=(chromium-runtime)
+        LOCAL_DEB_DESKTOP_FILE_ENTRIES=("${LOCAL_DEB_XFCE_FILE_ENTRIES[@]}")
+        LOCAL_DEB_DESKTOP_REQUIRED_ENTRIES=("${LOCAL_DEB_XFCE_REQUIRED_ENTRIES[@]}")
+    fi
     for purpose in "${LOCAL_DEB_DESKTOP_OPTIONAL_INSTALL_PURPOSES[@]}"; do
         if awk -F '\t' -v purpose="$purpose" '$6 == purpose { found=1 } END { exit !found }' \
             "$asset_dir/local-deb-manifest.tsv"; then

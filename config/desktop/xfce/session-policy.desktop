@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Desktop session policy
+Exec=/usr/libexec/ubuntu-xfce-session-policy
+OnlyShowIn=XFCE;
+NoDisplay=true
+Terminal=false

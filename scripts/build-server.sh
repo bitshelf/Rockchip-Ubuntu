@@ -9,7 +9,7 @@ VARIANT=server
 
 usage() {
     cat <<'EOF'
-usage: scripts/build-server.sh [--variant server|desktop] [--check]
+usage: scripts/build-server.sh [--variant server|desktop|desktop-xfce] [--check]
 
 Build an Ubuntu 26 Server ARM64 rootfs with ubuntu-image. The build supports
 native ARM64 and x86_64 hosts with qemu-aarch64 binfmt registration.
@@ -55,7 +55,7 @@ while (( $# > 0 )); do
         *) usage >&2; exit 2 ;;
     esac
 done
-[[ "$VARIANT" == server || "$VARIANT" == desktop ]] || die "unsupported variant: $VARIANT"
+[[ "$VARIANT" == server || "$VARIANT" == desktop || "$VARIANT" == desktop-xfce ]] || die "unsupported variant: $VARIANT"
 
 declare -A CALLER_ENV=()
 for env_name in BUILD_OUTPUT_DIR UBUNTU_PORTS_MIRROR UBUNTU_IMAGE APT_PROXY \
@@ -199,16 +199,18 @@ sed -e "s|@UBUNTU_PORTS_MIRROR@|${mirror}|g" \
     -e "s|@SEED_CACHE_ROOT@|${SEED_CACHE_ROOT}|g" \
     "$DEFINITION_TEMPLATE" >"$DEFINITION"
 
-if [[ "$VARIANT" == desktop ]]; then
+if [[ "$VARIANT" != server ]]; then
     # Reuse the Server seed and account policy. Only the explicit GNOME package
     # list differs; desktop metapackages would pull excluded product payloads.
-    desktop_packages="${PROJECT_DIR}/config/ubuntu-image/desktop.packages"
+    desktop_packages="${PROJECT_DIR}/config/ubuntu-image/${VARIANT}.packages"
+    desktop_title=GNOME
+    [[ "$VARIANT" != desktop-xfce ]] || desktop_title=XFCE
     extra_packages="${WORK_DIR}/desktop-extra-packages.yaml"
     awk 'NF && $1 !~ /^#/ {printf "    - {name: %s}\n", $1}' \
         "$desktop_packages" >"$extra_packages"
-    sed -i -e 's/name: ubuntu-server-arm64/name: ubuntu-desktop-arm64/' \
-        -e 's/display-name: Ubuntu Server arm64/display-name: Ubuntu GNOME arm64/' \
-        -e 's/ubuntu-26.04-server-arm64/ubuntu-26.04-desktop-arm64/g' \
+    sed -i -e "s/name: ubuntu-server-arm64/name: ubuntu-${VARIANT}-arm64/" \
+        -e "s/display-name: Ubuntu Server arm64/display-name: Ubuntu ${desktop_title} arm64/" \
+        -e "s/ubuntu-26.04-server-arm64/ubuntu-26.04-${VARIANT}-arm64/g" \
         -e "/^  extra-packages:/r $extra_packages" "$DEFINITION"
 fi
 
