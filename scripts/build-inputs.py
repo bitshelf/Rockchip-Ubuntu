@@ -34,8 +34,8 @@ def load(root):
     if data.get('chromium_webgpu_backend', 'auto') not in ('auto', 'gles-compat'):
         raise ValueError('invalid chromium_webgpu_backend')
     variants = data['variants']
-    if not isinstance(variants, list) or not variants or len(set(variants)) != len(variants) or any(v not in ('server', 'desktop') for v in variants):
-        raise ValueError('variants must contain server and/or desktop')
+    if not isinstance(variants, list) or not variants or len(set(variants)) != len(variants) or any(v not in ('server', 'desktop', 'desktop-xfce') for v in variants):
+        raise ValueError('variants must contain supported Server/GNOME/XFCE products')
     cmdline = data['boot'].get('cmdline', 'root=PARTLABEL=rootfs rootfstype=erofs rootwait ro')
     if not isinstance(cmdline, str) or '\n' in cmdline or '\r' in cmdline or '\0' in cmdline:
         raise ValueError('invalid boot cmdline')
@@ -189,7 +189,7 @@ def main():
     parser.add_argument('mode', choices=('check', 'pack', 'fetch', 'build'))
     parser.add_argument('--inputs', type=Path, default=PROJECT / 'artifacts')
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--variant', choices=('server', 'desktop'), default='server')
+    parser.add_argument('--variant', choices=('server', 'desktop', 'desktop-xfce'), default='server')
     args = parser.parse_args()
     root = args.inputs.absolute()
     if args.mode == 'pack':

@@ -5,7 +5,7 @@ p = argparse.ArgumentParser()
 p.add_argument('--work', type=pathlib.Path, required=True)
 p.add_argument('--tests', type=pathlib.Path, required=True)
 p.add_argument('--serial', required=True)
-p.add_argument('--mode', choices=['server', 'desktop'], required=True)
+p.add_argument('--mode', choices=['server', 'desktop', 'desktop-xfce'], required=True)
 p.add_argument('--user')
 p.add_argument('--gpu-stack', choices=['vendor', 'panfrost'], required=True)
 p.add_argument('--npu-qa-mode', choices=['latency', 'functional'], default='latency')
@@ -58,6 +58,9 @@ def cpu():
 env = dict(os.environ, GPU_STACK=a.gpu_stack)
 commands = {'gpu': (['bash', str(a.tests / 'test-gpu-headless-egl.sh')], env), 'npu': (['bash', str(a.tests / 'test-rknpu.sh')], dict(os.environ, RKNPU_QA_MODE=a.npu_qa_mode))}
 if a.mode == 'server':
+    if a.mode == 'desktop-xfce':
+        desktop.pop('WAYLAND_DISPLAY')
+        desktop.update(DISPLAY=':0', XAUTHORITY=account.pw_dir+'/.Xauthority', CHROMIUM_QA_SESSION='x11')
     commands['video'] = (['bash', str(a.tests / 'test-mpp.sh')], dict(os.environ))
 else:
     assert a.user and a.video and a.video.is_file()
@@ -95,11 +98,11 @@ try:
                 unexpected += 1
             temperatures = {d.name: (d / 'temp').read_text().strip() for d in pathlib.Path('/sys/class/thermal').glob('thermal_zone*') if (d / 'temp').exists()}
             record = {'elapsed_seconds': elapsed, 'boot_id': current, 'states': states, 'cpu_workers_alive': sum((x.is_alive() for x in cpus)), 'temperatures_millidegrees_c': temperatures}
-            if a.mode == 'desktop':
-                status = subprocess.run(['bash', str(a.tests / 'test-gnome.sh'), 'session'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15).returncode
+            if a.mode != 'server':
+                status = subprocess.run(['bash', str(a.tests / ('test-xfce.sh' if a.mode=='desktop-xfce' else 'test-gnome.sh'))], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15).returncode
                 if status:
                     errors += 1
-                record['physical_gnome_check_exit_code'] = status
+                record['physical_desktop_check_exit_code'] = status
             log.write(json.dumps(record) + '\n')
             log.flush()
             print(json.dumps(record), flush=True)

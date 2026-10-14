@@ -14,7 +14,11 @@ package_record="$(dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' c
 display_args=(--ozone-platform=wayland)
 if [[ "${CHROMIUM_QA_HEADLESS:-0}" == 1 ]]; then
     display_args=(--headless=new --ozone-platform=headless --window-size=1280,720)
+elif [[ "${CHROMIUM_QA_SESSION:-wayland}" == x11 ]]; then
+    [[ -n "${DISPLAY:-}" ]] || fail 'Xserver DISPLAY is missing'
+    display_args=(--ozone-platform=x11)
 else
+    [[ "${CHROMIUM_QA_SESSION:-wayland}" == wayland ]] || fail 'invalid CHROMIUM_QA_SESSION'
     [[ -n "${WAYLAND_DISPLAY:-}" && -n "${XDG_RUNTIME_DIR:-}" ]] || fail "run inside the GNOME Wayland session, or explicitly set CHROMIUM_QA_HEADLESS=1"
 fi
 test -e /dev/video-dec0 || fail "missing /dev/video-dec0"
@@ -25,7 +29,7 @@ mkdir -p "$work/profile"
 cp -- "$video_source" "$work/real-video.mp4"
 sha256sum "$work/real-video.mp4" >"$work/real-video.mp4.sha256"
 cat >"$work/player.html" <<'EOF'
-<!doctype html><meta charset="utf-8"><title>RK3576 Chromium MPP QA</title>
+<!doctype html><meta charset="utf-8"><title>Chromium MPP QA</title>
 <video id="qa-video" muted loop controls width="1280" height="720" src="real-video.mp4"></video>
 EOF
 irq_count() {

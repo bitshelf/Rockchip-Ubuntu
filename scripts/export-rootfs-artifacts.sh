@@ -26,7 +26,7 @@ case "$(uname -m)" in
     *) die "unsupported build-host architecture: $(uname -m)" ;;
 esac
 variant="${ROOTFS_VARIANT:-server}"
-[[ "$variant" == server || "$variant" == desktop ]] || die "invalid ROOTFS_VARIANT: $variant"
+[[ "$variant" == server || "$variant" == desktop || "$variant" == desktop-xfce ]] || die "invalid ROOTFS_VARIANT: $variant"
 images_dir="${1:-${BUILD_OUTPUT_DIR}/images}"
 [[ "$images_dir" == /* && -d "$images_dir" && ! -L "$images_dir" ]] ||
     die "images directory must be an existing absolute directory: $images_dir"
