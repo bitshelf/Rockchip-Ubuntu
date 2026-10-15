@@ -57,7 +57,7 @@ if [[ "$kind" == generic ]]; then
         status="$(curl --silent --show-error --output "$response" --write-out '%{http_code}' "${auth[@]}" "$url")"
         if [[ "$status" == 404 ]]; then
             curl --fail --silent --show-error "${auth[@]}" --request PUT \
-                --header 'Content-Type: application/octet-stream' --data-binary "@$file" "$url" >/dev/null
+                --header 'Content-Type: application/octet-stream' --upload-file "$file" "$url" >/dev/null
             curl --fail --silent --show-error "${auth[@]}" --output "$response" "$url"
         elif [[ "$status" != 200 ]]; then
             die "cannot query package asset (HTTP $status)"
@@ -92,12 +92,12 @@ for file in "$bundle" "${bundle}.sha256"; do
     else
         upload_url="$api/repos/$repository/releases/$release_id/assets"
     fi
-    upload_args=(--header 'Content-Type: application/octet-stream' --data-binary "@$file")
+    upload_args=(--header 'Content-Type: application/octet-stream' --upload-file "$file")
     if [[ "$provider" == forgejo ]]; then
         # Forgejo's release attachment API accepts the attachment form field.
         upload_args=(--form "attachment=@$file")
     fi
-    curl --fail --silent --show-error "${auth[@]}" "${upload_args[@]}" \
+    curl --fail --silent --show-error "${auth[@]}" --request POST "${upload_args[@]}" \
         "${upload_url}?name=$(jq -rn --arg value "$name" '$value|@uri')" >/dev/null
     echo "Uploaded release asset: $name"
 done
