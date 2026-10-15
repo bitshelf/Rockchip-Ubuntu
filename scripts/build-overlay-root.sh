@@ -47,7 +47,7 @@ esac
 (( $# == 0 )) || { usage >&2; exit 2; }
 
 declare -A CALLER_ENV=()
-for env_name in ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
+for env_name in ROOTFS_PACKAGE_MANIFEST ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
     EROFS_ROOTFS_IMAGE USERDATA_IMAGE USERDATA_SIZE_MB BOOTFS_OUTPUT \
     BOOTFS_CONFIG BOOTFS_TEMPLATE BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB \
     BOOTFS_SIZE_MB BOOTFS_LABEL BOOTFS_TIMEOUT BOOTFS_CMDLINE BOOTFS_REQUIRE_LOGOS \
@@ -177,7 +177,7 @@ validate_checksum "$ROOTFS_TARBALL"
 kernel_release="$(<"${PLATFORM_ASSET_DIR}/kernel-release")"
 "${SCRIPT_DIR}/check-kernel-config.sh" \
     "${PLATFORM_ASSET_DIR}/boot/kernel.config"
-for tool in chroot depmod dpkg-deb findmnt install jq mkfs.erofs mkfs.ext4 \
+for tool in chroot depmod dpkg-deb findmnt install jq python3 mkfs.erofs mkfs.ext4 \
         mount tar truncate umount; do
     command -v "$tool" >/dev/null || die "missing overlay-root build dependency: $tool"
 done
@@ -204,6 +204,7 @@ if [[ "$EUID" -ne 0 ]]; then
         --preserve-env=EROFS_ROOTFS_IMAGE \
         --preserve-env=PLATFORM_ASSET_DIR \
         --preserve-env=ROOTFS_TARBALL \
+        --preserve-env=ROOTFS_PACKAGE_MANIFEST \
         --preserve-env=SOC_MODEL \
         --preserve-env=USERDATA_IMAGE \
         --preserve-env=USERDATA_SIZE_MB \
@@ -384,12 +385,23 @@ done
 install -m 0644 "$initrd" "${work_dir}/initrd.img"
 find "$rootfs/boot" -mindepth 1 -delete
 
+# The existing base manifest excludes vendor DEBs. Export the final package set.
+if [[ -n "${ROOTFS_PACKAGE_MANIFEST:-}" ]]; then
+    python3 "${SCRIPT_DIR}/package-manifest.py" finalize --rootfs "$rootfs" \
+        --manifest "$ROOTFS_PACKAGE_MANIFEST"
+fi
+python3 "${SCRIPT_DIR}/package-manifest.py" export --rootfs "$rootfs" \
+    --output "${work_dir}/packages.manifest"
+
 image_stage="${EROFS_ROOTFS_IMAGE}.stage.$$"
 userdata_stage="${USERDATA_IMAGE}.stage.$$"
 rm -f -- "$image_stage" "$userdata_stage"
 mkfs.erofs -T 0 "$image_stage" "$rootfs" >/dev/null
 fsck.erofs "$image_stage" >/dev/null || die "generated EROFS failed integrity check"
 mv -f -- "$image_stage" "$EROFS_ROOTFS_IMAGE"
+install -m 0644 "${work_dir}/packages.manifest" "${EROFS_ROOTFS_IMAGE}.manifest"
+(cd "$IMAGES_DIR"; sha256sum "$(basename "${EROFS_ROOTFS_IMAGE}.manifest")" \
+    >"${EROFS_ROOTFS_IMAGE}.manifest.sha256")
 
 truncate -s "${USERDATA_SIZE_MB}M" "$userdata_stage"
 mkfs.ext4 -q -F -L userdata \
@@ -409,6 +421,8 @@ BOOTFS_INITRD="${work_dir}/initrd.img" BOOTFS_OUTPUT="$BOOTFS_OUTPUT" \
 )
 cat >"${EROFS_ROOTFS_IMAGE}.build-info" <<EOF
 schema=ubuntu-overlay-root-v1
+packages.manifest.sha256=$(sha256sum "${EROFS_ROOTFS_IMAGE}.manifest" | awk '{print $1}')
+packages.lock_input.sha256=$([[ -z "${ROOTFS_PACKAGE_MANIFEST:-}" ]] && echo none || sha256sum "$ROOTFS_PACKAGE_MANIFEST" | awk '{print $1}')
 filesystem=erofs
 filesystem.compression=none
 partition.label=rootfs
@@ -431,12 +445,14 @@ adb.network.namespace=host
 adb.shell.uid=0
 EOF
 chmod 0644 "$EROFS_ROOTFS_IMAGE" "$USERDATA_IMAGE" \
+    "${EROFS_ROOTFS_IMAGE}.manifest" "${EROFS_ROOTFS_IMAGE}.manifest.sha256" \
     "${EROFS_ROOTFS_IMAGE}.sha256" "${USERDATA_IMAGE}.sha256" \
     "${EROFS_ROOTFS_IMAGE}.build-info"
 validate_artifacts
 chown "${SUDO_UID:-0}:${SUDO_GID:-0}" \
     "$EROFS_ROOTFS_IMAGE" "$USERDATA_IMAGE" "$BOOTFS_OUTPUT" \
     "${EROFS_ROOTFS_IMAGE}.sha256" "${USERDATA_IMAGE}.sha256" \
+    "${EROFS_ROOTFS_IMAGE}.manifest" "${EROFS_ROOTFS_IMAGE}.manifest.sha256" \
     "${EROFS_ROOTFS_IMAGE}.build-info" "${BOOTFS_OUTPUT}.sha256" \
     "${BOOTFS_OUTPUT}.build-info"
 trap - EXIT

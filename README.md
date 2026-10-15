@@ -39,5 +39,6 @@ cp .env.example .env       # 按本机和平台输入修改；不要提交 .env
 | CI 构建与镜像发布 | [CI 与 Release](docs/CI-ASSETS.md) |
 | GNOME、XFCE 桌面配置 | [GNOME](docs/GNOME.md) · [XFCE](docs/XFCE.md) |
 | GPU、视频、摄像头、NPU、音频等功能 | [硬件功能与验收](docs/HARDWARE-FEATURES.md) |
+| 软件包版本导出与冻结重建 | [版本清单](docs/PACKAGE-MANIFEST.md) |
 | image、target、reboot、soak、promotion 门禁 | [发布验收](docs/RELEASE-GATES.md) |
 | 商业使用、许可与社区协作 | [商业使用说明](docs/COMMERCIAL-USE.md) · [贡献指南](CONTRIBUTING.md) |
