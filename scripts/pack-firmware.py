@@ -133,6 +133,8 @@ def pack(inputs, images, output):
             raise ValueError(f'image exceeds partition capacity: {part}')
     for tool, path in [('fsck.erofs', selected['rootfs.img']), ('e2fsck', selected['boot.img']), ('e2fsck', selected['userdata.img'])]:
         subprocess.run([tool, *(['-fn'] if tool == 'e2fsck' else []), str(path)], check=True)
+    if (images / 'packages.manifest').exists():
+        verified_image(images, 'packages.manifest')
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output.parent) as tmp:
         work = Path(tmp)
@@ -155,11 +157,17 @@ def pack(inputs, images, output):
                'build_inputs_sha256': os.environ.get('BUILD_INPUTS_SHA256'),
                'sdk_inputs': json.loads((root / 'manifest.json').read_text()),
                'filesystems': {name: sha(path) for name, path in selected.items()},
-               'update_img_sha256': sha(output)}
+               'update_img_sha256': sha(output),
+               'packages_manifest_sha256': sha(images / 'packages.manifest') if (images / 'packages.manifest').exists() else None}
     (output.parent / (output.name + '.json')).write_text(json.dumps(receipt, indent=2) + '\n')
     subprocess.run(['zstd', '-q', '-T0', '-10', str(output), '-o', str(output) + '.zst'], check=True)
     compressed = Path(str(output) + '.zst')
     (output.parent / (compressed.name + '.sha256')).write_text(f'{sha(compressed)}  {compressed.name}\n')
+    if (images / 'packages.manifest').exists():
+        manifest = verified_image(images, 'packages.manifest')
+        target = output.parent / (output.name + '.manifest')
+        shutil.copyfile(manifest, target)
+        Path(str(target) + '.sha256').write_text(f'{sha(target)}  {target.name}\n')
     print(f'Flashable SDK image: {compressed}')
 
 

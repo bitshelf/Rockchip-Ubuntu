@@ -68,6 +68,10 @@ if [[ "${ROOTFS_INCLUDE_FILESYSTEM_IMAGES:-no}" == yes ]]; then
         [[ -s "$image" && ! -L "$image" && -s "${image}.sha256" ]] || die "missing filesystem artifact: $image"
         (cd "$images_dir"; sha256sum --quiet -c "$(basename "${image}.sha256")") || die "filesystem checksum failed: $image"
         artifacts+=("$image" "${image}.sha256")
+        if [[ -s "${image}.manifest" ]]; then
+            (cd "$images_dir"; sha256sum --quiet -c "$(basename "${image}.manifest.sha256")") || die "package manifest checksum failed"
+            artifacts+=("${image}.manifest" "${image}.manifest.sha256")
+        fi
         [[ ! -s "${image}.build-info" ]] || artifacts+=("${image}.build-info")
     done
 fi

@@ -59,6 +59,7 @@ done
 
 declare -A CALLER_ENV=()
 for env_name in BUILD_OUTPUT_DIR UBUNTU_PORTS_MIRROR UBUNTU_IMAGE APT_PROXY \
+    ROOTFS_PACKAGE_MANIFEST PLATFORM_ASSET_DIR SOC_MODEL UPDATE_ENGINE_PACKAGE_DIR \
     HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
     if [[ -v "$env_name" ]]; then
         CALLER_ENV["$env_name"]="${!env_name}"
@@ -113,7 +114,7 @@ if [[ "$VARIANT" == desktop ]]; then
     [[ -s "${PROJECT_DIR}/config/ubuntu-image/desktop.packages" ]] || die "missing GNOME package list"
 fi
 
-for tool in awk findmnt git install jq sed sha256sum tar umount wget; do
+for tool in awk findmnt git install jq python3 sed sha256sum tar umount wget; do
     command -v "$tool" >/dev/null || die "missing build dependency: $tool"
 done
 [[ -x "$UBUNTU_IMAGE" ]] ||
@@ -121,6 +122,11 @@ done
 if [[ "$HOST_ARCH" == amd64 ]]; then
     [[ -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]] ||
         die "qemu-aarch64 binfmt is not registered; run scripts/setup-build-host.sh"
+fi
+
+if [[ -n "${ROOTFS_PACKAGE_MANIFEST:-}" ]]; then
+    [[ "$ROOTFS_PACKAGE_MANIFEST" == /* ]] || die 'ROOTFS_PACKAGE_MANIFEST must be absolute'
+    python3 "${SCRIPT_DIR}/package-manifest.py" check --manifest "$ROOTFS_PACKAGE_MANIFEST"
 fi
 
 if [[ "$MODE" == check ]]; then
@@ -133,7 +139,7 @@ if [[ "$MODE" == check ]]; then
 fi
 
 if [[ "$EUID" -ne 0 ]]; then
-    exec sudo --preserve-env=PYTHONDONTWRITEBYTECODE,BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
+    exec sudo --preserve-env=PYTHONDONTWRITEBYTECODE,ROOTFS_PACKAGE_MANIFEST,PLATFORM_ASSET_DIR,SOC_MODEL,UPDATE_ENGINE_PACKAGE_DIR,BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
         "$0" "${BUILD_ARGS[@]}"
 fi
 
@@ -246,6 +252,12 @@ http_proxy="${APT_PROXY:-}" https_proxy="" no_proxy="127.0.0.1,localhost" \
     die "ubuntu-image did not create the rootfs APT configuration directory"
 install -m 0644 "$APT_POLICY" \
     "${UI_WORK}/chroot/etc/apt/apt.conf.d/99-rockchip-product-policy"
+if [[ -n "${ROOTFS_PACKAGE_MANIFEST:-}" ]]; then
+    lock_debs=(--debs-dir "${PLATFORM_ASSET_DIR:-${BUILD_OUTPUT_DIR}/platform-assets/${SOC_MODEL:-}}/debs"
+               --debs-dir "${UPDATE_ENGINE_PACKAGE_DIR:-${BUILD_OUTPUT_DIR}/packages/update-engine}")
+    python3 "${SCRIPT_DIR}/package-manifest.py" pins --rootfs "${UI_WORK}/chroot" \
+        --manifest "$ROOTFS_PACKAGE_MANIFEST" "${lock_debs[@]}"
+fi
 http_proxy="${APT_PROXY:-}" https_proxy="" no_proxy="127.0.0.1,localhost" \
     "$UBUNTU_IMAGE" classic --workdir "$UI_WORK" --output-dir "$UI_OUTPUT" \
     --debug --resume "$DEFINITION" 2>&1 |
@@ -298,6 +310,7 @@ source.commit=${source_commit}
 source.dirty=${source_dirty}
 source.tree_sha256=${source_tree_sha256}
 built.at=$(date --iso-8601=seconds)
+packages.lock_input.sha256=$([[ -z "${ROOTFS_PACKAGE_MANIFEST:-}" ]] && echo none || sha256sum "$ROOTFS_PACKAGE_MANIFEST" | awk '{print $1}')
 EOF
 
 tar -tzf "${IMAGES_DIR}/${IMAGE_BASENAME}.rootfs.tar.gz" \

@@ -127,3 +127,8 @@ Server、GNOME 和 XFCE 的默认登录 shell 为 `/bin/bash`；首启管理员�
 
 XFCE/Xserver is built with `./build.sh desktop-xfce`; its image inputs,
 firstboot policy and acceptance are described in [docs/XFCE.md](XFCE.md).
+
+最终 rootfs 构建会导出包含本地 DEB 的包名、版本和架构清单。默认安装当前软件源的
+最新版本；仅显式指定 `ROOTFS_PACKAGE_MANIFEST` 或外部 build.json 的
+`package_manifests` 时冻结版本。导出、重建和 CI 使用方法见
+[软件包版本清单](PACKAGE-MANIFEST.md)。

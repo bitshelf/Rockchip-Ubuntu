@@ -84,6 +84,7 @@ jobs:
       - name: Pack complete flashable SDK image
         run: |
           test "$(cat artifacts/${{ matrix.variant }}/BUILD_INPUTS_SHA256)" = "$BUILD_INPUTS_SHA256"
+          test -s "artifacts/${{ matrix.variant }}/packages.manifest"
           python3 scripts/pack-firmware.py pack --inputs "$RUNNER_TEMP/pack-inputs/firmware" --images "artifacts/${{ matrix.variant }}" --output "$RUNNER_TEMP/release/ubuntu-26.04-${{ matrix.variant }}-update.img"
           rm -- "$RUNNER_TEMP/release/ubuntu-26.04-${{ matrix.variant }}-update.img"
       - uses: actions/upload-artifact@v4
