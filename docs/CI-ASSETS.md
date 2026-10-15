@@ -119,6 +119,11 @@ identify Ubuntu version, variant and image type; source and binary-input hashes
 live in each receipt. Published version tags and image bytes are preserved;
 new binaries use a new version rather than overwriting an existing release.
 
+Optional package version replay is selected per product in external `build.json`;
+without that selection packages use the latest configured archive candidates.
+See [package manifests](PACKAGE-MANIFEST.md) for final DEB export, replay and
+old-version archive requirements. New image releases include manifest sidecars.
+
 ## 原生构建缓存清理
 
 Forgejo 成功上传 filesystem 附件后，会校验并删除 runner 上重复保存的原始

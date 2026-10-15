@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 import tempfile
@@ -25,6 +26,7 @@ with tempfile.TemporaryDirectory() as tmp:
     project = Path(tmp)
     module.PROJECT = project
     (project / 'scripts').mkdir()
+    shutil.copy2(script.parent / 'package-manifest.py', project / 'scripts/package-manifest.py')
     for path in (project / 'scripts/stage-sdk-assets.sh', project / 'build.sh'):
         path.write_text('#!/bin/sh\nexit 0\n')
         path.chmod(0o755)
@@ -59,8 +61,12 @@ with tempfile.TemporaryDirectory() as tmp:
         output = project / f'build-{soc}'
         (output / 'images').mkdir(parents=True)
         (output / 'images/root.rootfs.erofs.img').write_bytes(b'fixture')
+        (output / 'images/root.rootfs.erofs.img.manifest').write_text('# ubuntu-package-manifest-v1\nfixture 1.0 arm64\n')
+        captured_envs = []
         real_run = module.run
         def fixture_run(*args, **kwargs):
+            if kwargs.get('env') and args[0] == str(project / 'build.sh') and args[1:] != ('update-engine', '--check'):
+                captured_envs.append(kwargs['env'])
             if args[0] == 'cp':
                 return real_run(*args, **kwargs)
         module.run = fixture_run
@@ -68,6 +74,7 @@ with tempfile.TemporaryDirectory() as tmp:
             module.build(dest, output, 'desktop-xfce')
         finally:
             module.run = real_run
+        assert captured_envs and all(e['ROOTFS_PACKAGE_MANIFEST'] == '' for e in captured_envs), 'default build unexpectedly froze packages'
         timeout = int(subprocess.check_output(
             ['bash', '-c', 'source "$1"; printf "%s" "$BOOTFS_TIMEOUT"',
              'boot-policy-qa', str(output / 'bootfs.conf')], text=True))
@@ -80,6 +87,30 @@ with tempfile.TemporaryDirectory() as tmp:
             raise AssertionError('corrupt download accepted')
         assert not (project / 'corrupt').exists()
         server.shutdown()
+        # Merely placing a manifest in artifacts does not enable freezing.
+        (root / 'manifests').mkdir()
+        (root / 'manifests/xfce.manifest').write_text('# ubuntu-package-manifest-v1\nfixture 1.0 arm64\n')
+        data['package_manifests'] = {'desktop-xfce': 'manifests/xfce.manifest'}
+        (root / 'build.json').write_text(json.dumps(data))
+        locked_bundle = project / f'{soc}-locked.tar.zst'
+        module.pack(root, locked_bundle)
+        # Check that only an explicit product selection reaches build.sh.
+        captured_envs.clear()
+        module.run = fixture_run
+        try:
+            module.build(root, output, 'desktop-xfce')
+        finally:
+            module.run = real_run
+        assert captured_envs and all(e['ROOTFS_PACKAGE_MANIFEST'] == str(root / 'manifests/xfce.manifest') for e in captured_envs)
+        data['package_manifests']['desktop-xfce'] = '../escape.manifest'
+        (root / 'build.json').write_text(json.dumps(data))
+        try:
+            module.load(root)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('manifest path escape accepted')
+        data.pop('package_manifests')
         data['boot']['base_dtb'] = '../../outside.dtb'
         (root / 'build.json').write_text(json.dumps(data))
         try:

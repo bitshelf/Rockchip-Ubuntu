@@ -36,6 +36,16 @@ def load(root):
     variants = data['variants']
     if not isinstance(variants, list) or not variants or len(set(variants)) != len(variants) or any(v not in ('server', 'desktop', 'desktop-xfce') for v in variants):
         raise ValueError('variants must contain supported Server/GNOME/XFCE products')
+    manifests = data.get('package_manifests', {})
+    if not isinstance(manifests, dict) or any(v not in variants for v in manifests):
+        raise ValueError('package_manifests must map enabled variants to manifest files')
+    for variant, name in manifests.items():
+        if not isinstance(name, str):
+            raise ValueError('invalid package manifest path')
+        path = Path(name)
+        target = root / path
+        if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != 'manifests' or target.is_symlink() or not target.is_file() or root not in target.resolve().parents:
+            raise ValueError('package manifest must be a regular file below artifacts/manifests/')
     cmdline = data['boot'].get('cmdline', 'root=PARTLABEL=rootfs rootfstype=erofs rootwait ro')
     if not isinstance(cmdline, str) or '\n' in cmdline or '\r' in cmdline or '\0' in cmdline:
         raise ValueError('invalid boot cmdline')
@@ -62,6 +72,8 @@ def check(root, output):
     env = env_for(root, data, output)
     run(str(PROJECT / 'scripts/stage-sdk-assets.sh'), '--check', env=env)
     run(str(PROJECT / 'build.sh'), 'update-engine', '--check', env=env)
+    for name in data.get('package_manifests', {}).values():
+        run('python3', str(PROJECT / 'scripts/package-manifest.py'), 'check', '--manifest', str(root / name))
     return root, data
 
 
@@ -69,6 +81,8 @@ def pack(root, output):
     root, data = check(root, PROJECT / 'build/input-check')
     # Inputs alone are transported: published images and previous bundles are excluded.
     members = ['build.json', f"platform-assets/{data['soc']}", 'sources']
+    if data.get('package_manifests'):
+        members.append('manifests')
     if (root / 'firmware').is_dir():
         run('python3', str(PROJECT / 'scripts/pack-firmware.py'), 'check', '--inputs', str(root / 'firmware'))
         members.append('firmware')
@@ -137,6 +151,8 @@ def build(root, output, variant):
         raise ValueError(f'{variant} not enabled in build.json')
     output.mkdir(parents=True, exist_ok=True)
     env = env_for(root, data, output)
+    manifest = data.get('package_manifests', {}).get(variant)
+    env['ROOTFS_PACKAGE_MANIFEST'] = str(root / manifest) if manifest else ''
     overlays = root / 'overlays'
     overlays.mkdir(exist_ok=True)
     env['DTS_OVERLAY_DIR'] = str(overlays)
@@ -169,6 +185,13 @@ def build(root, output, variant):
         raise ValueError('expected one rootfs filesystem image')
     published = PROJECT / 'artifacts' / variant
     published.mkdir(parents=True, exist_ok=True)
+    package_manifest = Path(str(images[0]) + '.manifest')
+    if not package_manifest.is_file():
+        raise ValueError('final EROFS package manifest is missing')
+    shutil.copy2(package_manifest, published / 'packages.manifest')
+    with (published / 'packages.manifest').open('rb') as stream:
+        package_digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+    (published / 'packages.manifest.sha256').write_text(f'{package_digest}  packages.manifest\n')
     target = published / 'ubuntu-rootfs.img'
     run('cp', '--reflink=auto', str(images[0]), str(target))
     with target.open('rb') as stream:
