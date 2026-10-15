@@ -69,6 +69,9 @@ def pack(root, output):
     root, data = check(root, PROJECT / 'build/input-check')
     # Inputs alone are transported: published images and previous bundles are excluded.
     members = ['build.json', f"platform-assets/{data['soc']}", 'sources']
+    if (root / 'firmware').is_dir():
+        run('python3', str(PROJECT / 'scripts/pack-firmware.py'), 'check', '--inputs', str(root / 'firmware'))
+        members.append('firmware')
     if (root / 'overlays').is_dir():
         members.append('overlays')
     with tempfile.TemporaryDirectory() as tmp:
