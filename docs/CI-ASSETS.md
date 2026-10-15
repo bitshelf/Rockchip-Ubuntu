@@ -71,8 +71,9 @@ input SHA256, filesystem integrity, partition capacity and RKFW output header.
 Missing firmware inputs fail the job; an ordinary rootfs is not renamed to
 `update.img`.
 
-After all variants pack successfully, a final job creates a public prerelease
-named `ubuntu26-build-<run>-<attempt>`. Each variant has a complete
+Branch pushes and manual dispatches build and package all variants as Actions
+artifacts. Push a version tag such as `v0.1.0-alpha.2` to build and publish a
+versioned Release after all variants succeed. Each variant has a complete
 `ubuntu-26.04-<variant>-update.img.zst`, SHA256 sidecar and a JSON build receipt.
 Check the checksum, run `zstd -d <file>.img.zst`, and use the SDK flashing tool
 with the resulting full image. Full-image flashing uses its embedded partition
@@ -85,6 +86,38 @@ The workflow token needs `contents: write` to create Releases. The local upload
 token needs Contents and Actions Variables write permissions, plus Actions
 write permission when requesting `--build`. No credentials go into `artifacts/`
 or Git. Large assets are uploaded as streams rather than loaded into RAM.
+
+
+## Release conventions
+
+Public titles describe ARM64 Linux images without presenting this project as
+an official distribution. Retain factual upstream attribution and licence
+notices. Branding, proprietary SDK inputs and commercial redistribution still
+need the review described in [COMMERCIAL-USE.md](COMMERCIAL-USE.md). Historical
+artifact filenames and source identities are not rewritten by documentation changes.
+
+Release titles match semantic version tags: `v0.1.0-alpha.1`,
+`v0.1.0-beta.1`, `v0.1.0-rc.1`, then `v0.1.0`. Prerelease tags receive the
+Pre-release badge. A CI run ID is provenance, not a public version number.
+Only the `ubuntu26` source branch is required; release tags do not add branches.
+
+Maintain bilingual changes in `config/release/notes.json`. Releases include
+Chinese/English navigation, New Features, Bug Fixes, Improvements, Other
+Changes, download instructions and the actual validation state. GitHub's
+`--generate-notes` supplies the real change links and contributor attribution
+using `.github/release.yml`; do not invent contributors or successful hardware
+results. Update the notes and renderer when a later batch passes acceptance.
+
+```bash
+# After committing the intended release source on ubuntu26:
+git tag -a v0.1.0-alpha.2 -m 'v0.1.0-alpha.2'
+git push origin v0.1.0-alpha.2
+```
+
+Binary inputs are still uploaded externally before tagging. Artifact filenames
+identify Ubuntu version, variant and image type; source and binary-input hashes
+live in each receipt. Published version tags and image bytes are preserved;
+new binaries use a new version rather than overwriting an existing release.
 
 ## 原生构建缓存清理
 

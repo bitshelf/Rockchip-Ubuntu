@@ -3,6 +3,7 @@ name: Ubuntu flashable images
 on:
   push:
     branches: [ubuntu26]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -23,6 +24,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate release version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 scripts/release-notes.py --tag "$GITHUB_REF_NAME" --validate-only
 
       - name: Install native rootfs build prerequisites
         run: |
@@ -89,11 +94,13 @@ jobs:
           compression-level: 0
 
   publish-images:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: pack-firmware
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: flashable-*-${{ github.run_id }}
@@ -106,13 +113,8 @@ jobs:
           SOURCE_COMMIT: ${{ github.sha }}
           INPUT_SHA256: ${{ vars.BUILD_INPUTS_SHA256 }}
         run: |
-          tag="ubuntu26-build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          cat > release-notes.md <<EOF
-          Complete Rockchip SDK update.img images built from commit $SOURCE_COMMIT.
-          External local binary input bundle SHA256: $INPUT_SHA256.
-          U-Boot, kernel, DEB and KO inputs are uploaded separately and are not stored in Git.
-          Decompress each .img.zst with zstd -d before flashing. Verify its .sha256 first.
-          This is an automated build release. Hardware acceptance is tracked separately;
-          CI build success does not certify a new image on a physical board.
-          EOF
-          gh release create "$tag" --repo "$GH_REPO" --target "$SOURCE_COMMIT" --title "Ubuntu 26 images · build $GITHUB_RUN_ID" --prerelease --notes-file release-notes.md release/*
+          tag="$GITHUB_REF_NAME"
+          python3 scripts/release-notes.py --tag "$tag" --repository "$GH_REPO" --commit "$SOURCE_COMMIT" --inputs-sha256 "$INPUT_SHA256" --output release-notes.md
+          args=("$tag" --repo "$GH_REPO" --verify-tag --title "$tag" --generate-notes --notes-file release-notes.md)
+          [[ "$tag" != *-* ]] || args+=(--prerelease)
+          gh release create "${args[@]}" release/*

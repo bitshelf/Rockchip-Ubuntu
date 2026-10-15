@@ -1,0 +1,19 @@
+{
+  "features": [
+    {"zh": "提供 Server、GNOME 和 XFCE 三种 ARM64 Linux 镜像。", "en": "Provide Server, GNOME and XFCE ARM64 Linux images."},
+    {"zh": "集成本地构建的 Chromium、MPP/RGA/NPU 运行库以及 Fcitx5/Rime 中文输入支持。", "en": "Integrate locally built Chromium, MPP/RGA/NPU libraries and Fcitx5/Rime Chinese input support."},
+    {"zh": "在 ARM64 上构建 rootfs，使用 SDK 打包工具生成完整可烧录 update.img。", "en": "Build rootfs natively on ARM64 and produce complete flashable update.img files with the SDK pack tools."}
+  ],
+  "fixes": [
+    {"zh": "修正 GNOME 输入法面板提示，并禁用默认空闲息屏。", "en": "Correct the GNOME input-method panel notification and disable idle screen blanking by default."},
+    {"zh": "为 XFCE 显式选择认证代理，避免网络管理组件带入 GNOME Shell。", "en": "Select an explicit authentication agent for XFCE to prevent network management dependencies from pulling in GNOME Shell."}
+  ],
+  "improvements": [
+    {"zh": "默认登录 Shell 使用 Bash，首次启动通过英文提示创建管理员账号。", "en": "Use Bash as the default login shell and create the administrator account through English first-boot prompts."},
+    {"zh": "每种镜像附带 SHA256 校验文件和源码、二进制输入构建记录。", "en": "Include SHA256 checksums and source/binary-input build receipts for every image."}
+  ],
+  "other": [
+    {"zh": "U-Boot、kernel、DEB、KO 等二进制输入通过附件上传，不提交到 Git。", "en": "Upload U-Boot, kernel, DEB and KO binary inputs as attachments rather than committing them to Git."},
+    {"zh": "版本发布使用语义化标签；构建成功与实机验收结果分别记录。", "en": "Use semantic version tags for releases and record build success separately from physical board acceptance."}
+  ]
+}
