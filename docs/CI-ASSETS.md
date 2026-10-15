@@ -38,6 +38,54 @@ ARM64 回传的 rootfs 放到 `ubuntu/artifacts/ubuntu-rootfs.img`，
 `rockdev/rootfs.img` 指向此文件，再使用 SDK 原有打包流程。见
 [SDK-IMAGE-PIPELINE.md](SDK-IMAGE-PIPELINE.md)。
 
+## GitHub complete flashable images
+
+Keep the single source branch `ubuntu26`. Build U-Boot, kernel, matching KO,
+DEB and vendor inputs locally, then stage them under the ignored `artifacts/`
+directory using the existing platform-asset manifest. These binaries are
+Release attachments, never Git objects.
+
+After completing the SDK's normal `./build.sh updateimg` once locally, capture
+its selected loader, U-Boot, recovery, partition table, package list and tools:
+
+```bash
+python3 scripts/pack-firmware.py stage --sdk ..
+python3 scripts/pack-firmware.py check
+# Load GH_TOKEN privately from your local credential file first.
+python3 scripts/publish-build-inputs.py github \
+  --repository bitshelf/Rockchip-Ubuntu --build --ref ubuntu26
+```
+
+The repository argument selects your destination repository. The SDK argument
+selects your local SDK; no board name or SoC CI parameter is required.
+`artifacts/firmware/manifest.json` hashes every external packaging input.
+The uploader includes this directory alongside `build.json`, platform assets,
+source archives and optional overlays. Replacing these local inputs and
+uploading a new bundle selects another board/SoC. Do not reuse an incompatible
+loader, U-Boot, recovery or partition table from a different board.
+
+GitHub first builds each rootfs on native ARM64, then uses an x86 runner for
+the SDK's existing `afptool -pack` and `rkImageMaker` commands. This preserves
+the SDK image format without compiling kernel or bootloader in CI. It checks
+input SHA256, filesystem integrity, partition capacity and RKFW output header.
+Missing firmware inputs fail the job; an ordinary rootfs is not renamed to
+`update.img`.
+
+After all variants pack successfully, a final job creates a public prerelease
+named `ubuntu26-build-<run>-<attempt>`. Each variant has a complete
+`ubuntu-26.04-<variant>-update.img.zst`, SHA256 sidecar and a JSON build receipt.
+Check the checksum, run `zstd -d <file>.img.zst`, and use the SDK flashing tool
+with the resulting full image. Full-image flashing uses its embedded partition
+and loader configuration; select it deliberately rather than treating it as a
+rootfs-only update. Automated prereleases report build success separately from
+physical board acceptance. Existing accepted release evidence is not reused
+for a new image hash.
+
+The workflow token needs `contents: write` to create Releases. The local upload
+token needs Contents and Actions Variables write permissions, plus Actions
+write permission when requesting `--build`. No credentials go into `artifacts/`
+or Git. Large assets are uploaded as streams rather than loaded into RAM.
+
 ## 原生构建缓存清理
 
 Forgejo 成功上传 filesystem 附件后，会校验并删除 runner 上重复保存的原始
