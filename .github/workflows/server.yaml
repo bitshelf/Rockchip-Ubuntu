@@ -1,8 +1,8 @@
-name: Ubuntu rootfs
+name: Ubuntu flashable images
 
 on:
   push:
-    branches: ['**']
+    branches: [ubuntu26]
   workflow_dispatch:
 
 jobs:
@@ -39,6 +39,9 @@ jobs:
       - name: Build native ARM64 filesystem images
         run: python3 scripts/build-inputs.py build --inputs "$RUNNER_TEMP/ubuntu-inputs-${{ github.run_id }}-${{ matrix.variant }}" --output "$BUILD_OUTPUT_DIR" --variant ${{ matrix.variant }}
 
+      - name: Bind exported images to the binary input bundle
+        run: printf '%s\n' "$BUILD_INPUTS_SHA256" > "artifacts/${{ matrix.variant }}/BUILD_INPUTS_SHA256"
+
       - name: Export verified filesystem artifacts
         id: rootfs-artifacts
         run: ROOTFS_VARIANT=${{ matrix.variant }} ROOTFS_INCLUDE_FILESYSTEM_IMAGES=yes ./scripts/export-rootfs-artifacts.sh
@@ -50,3 +53,66 @@ jobs:
           path: artifacts/${{ matrix.variant }}/
           if-no-files-found: error
           compression-level: 1
+
+  pack-firmware:
+    needs: build-rootfs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [server, desktop, desktop-xfce]
+    env:
+      BUILD_INPUTS_URL: ${{ vars.BUILD_INPUTS_URL }}
+      BUILD_INPUTS_SHA256: ${{ vars.BUILD_INPUTS_SHA256 }}
+      BUILD_INPUTS_AUTH_HEADER: ${{ secrets.BUILD_INPUTS_AUTH_HEADER }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDK packaging prerequisites
+        run: sudo -n apt-get update && sudo -n apt-get install -y erofs-utils e2fsprogs zstd curl
+      - name: Download verified external SDK inputs
+        run: python3 scripts/build-inputs.py fetch --inputs "$RUNNER_TEMP/pack-inputs"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-${{ matrix.variant }}-${{ github.run_id }}
+          path: artifacts/${{ matrix.variant }}
+      - name: Pack complete flashable SDK image
+        run: |
+          test "$(cat artifacts/${{ matrix.variant }}/BUILD_INPUTS_SHA256)" = "$BUILD_INPUTS_SHA256"
+          python3 scripts/pack-firmware.py pack --inputs "$RUNNER_TEMP/pack-inputs/firmware" --images "artifacts/${{ matrix.variant }}" --output "$RUNNER_TEMP/release/ubuntu-26.04-${{ matrix.variant }}-update.img"
+          rm -- "$RUNNER_TEMP/release/ubuntu-26.04-${{ matrix.variant }}-update.img"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flashable-${{ matrix.variant }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          compression-level: 0
+
+  publish-images:
+    needs: pack-firmware
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: flashable-*-${{ github.run_id }}
+          path: release
+          merge-multiple: true
+      - name: Publish complete images to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          INPUT_SHA256: ${{ vars.BUILD_INPUTS_SHA256 }}
+        run: |
+          tag="ubuntu26-build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cat > release-notes.md <<EOF
+          Complete Rockchip SDK update.img images built from commit $SOURCE_COMMIT.
+          External local binary input bundle SHA256: $INPUT_SHA256.
+          U-Boot, kernel, DEB and KO inputs are uploaded separately and are not stored in Git.
+          Decompress each .img.zst with zstd -d before flashing. Verify its .sha256 first.
+          This is an automated build release. Hardware acceptance is tracked separately;
+          CI build success does not certify a new image on a physical board.
+          EOF
+          gh release create "$tag" --repo "$GH_REPO" --target "$SOURCE_COMMIT" --title "Ubuntu 26 images · build $GITHUB_RUN_ID" --prerelease --notes-file release-notes.md release/*
