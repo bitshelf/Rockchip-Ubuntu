@@ -59,6 +59,7 @@ def load(root):
 def env_for(root, data, output):
     return os.environ | {
         'BUILD_OUTPUT_DIR': str(output), 'SOC_MODEL': data['soc'],
+        'BLUETOOTH_ASSET_DIR': str(root / 'bluetooth'),
         'PLATFORM_ASSET_DIR': str(root / 'platform-assets' / data['soc']),
         'BOOTFS_BASE_DTB': data['boot']['base_dtb'],
         'GPU_STACK': data['gpu_stack'],
@@ -70,6 +71,7 @@ def env_for(root, data, output):
 def check(root, output):
     root, data = load(root)
     env = env_for(root, data, output)
+    run('python3', str(PROJECT / 'package/bluetooth/import-assets.py'), 'check', '--inputs', str(root / 'bluetooth'))
     run(str(PROJECT / 'scripts/stage-sdk-assets.sh'), '--check', env=env)
     run(str(PROJECT / 'build.sh'), 'update-engine', '--check', env=env)
     for name in data.get('package_manifests', {}).values():
@@ -86,6 +88,8 @@ def pack(root, output):
     if (root / 'firmware').is_dir():
         run('python3', str(PROJECT / 'scripts/pack-firmware.py'), 'check', '--inputs', str(root / 'firmware'))
         members.append('firmware')
+    if (root / 'bluetooth').is_dir():
+        members.append('bluetooth')
     if (root / 'overlays').is_dir():
         members.append('overlays')
     with tempfile.TemporaryDirectory() as tmp:

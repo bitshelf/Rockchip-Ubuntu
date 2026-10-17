@@ -47,7 +47,7 @@ esac
 (( $# == 0 )) || { usage >&2; exit 2; }
 
 declare -A CALLER_ENV=()
-for env_name in ROOTFS_PACKAGE_MANIFEST ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
+for env_name in BLUETOOTH_ASSET_DIR ROOTFS_PACKAGE_MANIFEST ENABLE_CONSOLE_FIRSTBOOT FIRSTBOOT_PROFILE BUILD_OUTPUT_DIR SOC_MODEL PLATFORM_ASSET_DIR ROOTFS_TARBALL \
     EROFS_ROOTFS_IMAGE USERDATA_IMAGE USERDATA_SIZE_MB BOOTFS_OUTPUT \
     BOOTFS_CONFIG BOOTFS_TEMPLATE BOOTFS_BASE_DTB BOOTFS_INSTALLED_DTB \
     BOOTFS_SIZE_MB BOOTFS_LABEL BOOTFS_TIMEOUT BOOTFS_CMDLINE BOOTFS_REQUIRE_LOGOS \
@@ -67,6 +67,10 @@ for env_name in "${!CALLER_ENV[@]}"; do
     printf -v "$env_name" '%s' "${CALLER_ENV[$env_name]}"
     export "${env_name?}"
 done
+
+BLUETOOTH_ASSET_DIR="${BLUETOOTH_ASSET_DIR:-${PROJECT_DIR}/artifacts/bluetooth}"
+export BLUETOOTH_ASSET_DIR
+python3 "${PROJECT_DIR}/package/bluetooth/import-assets.py" check --inputs "$BLUETOOTH_ASSET_DIR" >/dev/null
 
 HOST_ARCH="$(host_arch)"
 if [[ "$HOST_ARCH" == arm64 ]]; then
@@ -202,7 +206,7 @@ if [[ "$EUID" -ne 0 ]]; then
         --preserve-env=DTS_OVERLAY_DIR \
         --preserve-env=BUILD_OUTPUT_DIR \
         --preserve-env=EROFS_ROOTFS_IMAGE \
-        --preserve-env=PLATFORM_ASSET_DIR \
+        --preserve-env=BLUETOOTH_ASSET_DIR,PLATFORM_ASSET_DIR \
         --preserve-env=ROOTFS_TARBALL \
         --preserve-env=ROOTFS_PACKAGE_MANIFEST \
         --preserve-env=SOC_MODEL \
@@ -317,6 +321,8 @@ fi
 "${SCRIPT_DIR}/install-rga.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-mpp.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
 "${SCRIPT_DIR}/install-local-debs.sh" "$rootfs" "$PLATFORM_ASSET_DIR"
+python3 "${PROJECT_DIR}/package/bluetooth/import-assets.py" install \
+    --inputs "$BLUETOOTH_ASSET_DIR" --rootfs "$rootfs"
 if [[ -d "$PLATFORM_ASSET_DIR/iqfiles" ]]; then
     install -d -m 0755 "$rootfs/etc/iqfiles"
     while IFS= read -r -d '' iq_file; do
@@ -419,6 +425,11 @@ BOOTFS_INITRD="${work_dir}/initrd.img" BOOTFS_OUTPUT="$BOOTFS_OUTPUT" \
     sha256sum "$(basename "$USERDATA_IMAGE")" \
         >"$(basename "$USERDATA_IMAGE").sha256"
 )
+bluetooth_assets_sha256=none
+if [[ -f "$rootfs/usr/share/platform-bluetooth/assets.json" ]]; then
+    bluetooth_assets_sha256="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sha256"])' \
+        "$rootfs/usr/share/platform-bluetooth/assets.json")"
+fi
 cat >"${EROFS_ROOTFS_IMAGE}.build-info" <<EOF
 schema=ubuntu-overlay-root-v1
 packages.manifest.sha256=$(sha256sum "${EROFS_ROOTFS_IMAGE}.manifest" | awk '{print $1}')
@@ -436,6 +447,7 @@ update-engine.version=${update_engine_version}
 update-engine.deb.sha256=${update_engine_sha256}
 kernel.release=${kernel_release}
 kernel.config.sha256=$(sha256sum "${PLATFORM_ASSET_DIR}/boot/kernel.config" | awk '{print $1}')
+bluetooth.assets.sha256=${bluetooth_assets_sha256}
 platform.assets.sha256=$(sha256sum "${PLATFORM_ASSET_DIR}/SHA256SUMS" | awk '{print $1}')
 initramfs.sha256=$(sha256sum "${work_dir}/initrd.img" | awk '{print $1}')
 bootfs.image=$(basename "$BOOTFS_OUTPUT")

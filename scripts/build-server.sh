@@ -58,7 +58,7 @@ done
 [[ "$VARIANT" == server || "$VARIANT" == desktop || "$VARIANT" == desktop-xfce ]] || die "unsupported variant: $VARIANT"
 
 declare -A CALLER_ENV=()
-for env_name in BUILD_OUTPUT_DIR UBUNTU_PORTS_MIRROR UBUNTU_IMAGE APT_PROXY \
+for env_name in BLUETOOTH_ASSET_DIR BUILD_OUTPUT_DIR UBUNTU_PORTS_MIRROR UBUNTU_IMAGE APT_PROXY \
     ROOTFS_PACKAGE_MANIFEST PLATFORM_ASSET_DIR SOC_MODEL UPDATE_ENGINE_PACKAGE_DIR \
     HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
     if [[ -v "$env_name" ]]; then
@@ -79,6 +79,10 @@ done
 UBUNTU_SERIES=resolute
 UBUNTU_VERSION=26.04
 ARCHITECTURE=arm64
+BLUETOOTH_ASSET_DIR="${BLUETOOTH_ASSET_DIR:-${PROJECT_DIR}/artifacts/bluetooth}"
+export BLUETOOTH_ASSET_DIR
+python3 "${PROJECT_DIR}/package/bluetooth/import-assets.py" check --inputs "$BLUETOOTH_ASSET_DIR" >/dev/null
+
 HOST_ARCH="$(host_arch)"
 if [[ "$HOST_ARCH" == arm64 ]]; then
     BUILD_OUTPUT_DIR="${BUILD_OUTPUT_DIR:-/var/lib/ubuntu-ci/build}"
@@ -139,7 +143,7 @@ if [[ "$MODE" == check ]]; then
 fi
 
 if [[ "$EUID" -ne 0 ]]; then
-    exec sudo --preserve-env=PYTHONDONTWRITEBYTECODE,ROOTFS_PACKAGE_MANIFEST,PLATFORM_ASSET_DIR,SOC_MODEL,UPDATE_ENGINE_PACKAGE_DIR,BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
+    exec sudo --preserve-env=BLUETOOTH_ASSET_DIR,PYTHONDONTWRITEBYTECODE,ROOTFS_PACKAGE_MANIFEST,PLATFORM_ASSET_DIR,SOC_MODEL,UPDATE_ENGINE_PACKAGE_DIR,BUILD_OUTPUT_DIR,UBUNTU_PORTS_MIRROR,UBUNTU_IMAGE,UBUNTU_SERIES,UBUNTU_VERSION,APT_PROXY,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy \
         "$0" "${BUILD_ARGS[@]}"
 fi
 
@@ -219,6 +223,11 @@ if [[ "$VARIANT" != server ]]; then
         -e "s/ubuntu-26.04-server-arm64/ubuntu-26.04-${VARIANT}-arm64/g" \
         -e "/^  extra-packages:/r $extra_packages" "$DEFINITION"
 fi
+
+bluetooth_packages="${WORK_DIR}/bluetooth-extra-packages.yaml"
+python3 "${PROJECT_DIR}/package/bluetooth/import-assets.py" packages --inputs "$BLUETOOTH_ASSET_DIR" |
+    awk 'NF {printf "    - {name: %s}\n", $1}' >"$bluetooth_packages"
+sed -i -e "/^  extra-packages:/r $bluetooth_packages" "$DEFINITION"
 
 info "Build Ubuntu ${UBUNTU_VERSION} ${VARIANT} ARM64 rootfs on ${HOST_ARCH}"
 http_proxy="${APT_PROXY:-}" https_proxy="" no_proxy="127.0.0.1,localhost" \

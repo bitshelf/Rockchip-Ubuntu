@@ -27,6 +27,9 @@ with tempfile.TemporaryDirectory() as tmp:
     module.PROJECT = project
     (project / 'scripts').mkdir()
     shutil.copy2(script.parent / 'package-manifest.py', project / 'scripts/package-manifest.py')
+    bluetooth_importer = project / 'package/bluetooth/import-assets.py'
+    bluetooth_importer.parent.mkdir(parents=True)
+    shutil.copy2(script.parent.parent / 'package/bluetooth/import-assets.py', bluetooth_importer)
     for path in (project / 'scripts/stage-sdk-assets.sh', project / 'build.sh'):
         path.write_text('#!/bin/sh\nexit 0\n')
         path.chmod(0o755)
@@ -43,6 +46,12 @@ with tempfile.TemporaryDirectory() as tmp:
         (root / 'build.json').write_text(json.dumps(data))
         # Published files must never be sent back as build inputs.
         (root / 'ubuntu-rootfs.img').write_bytes(b'not-an-input')
+        # One platform has optional radio files; the other exercises absence.
+        if soc == 'rk3588':
+            radio = root / 'bluetooth/rootfs/usr/libexec/platform-bluetooth/start'
+            radio.parent.mkdir(parents=True)
+            radio.write_text('#!/bin/sh\nexit 0\n')
+            radio.chmod(0o755)
         bundle = project / f'{soc}.tar.zst'
         module.pack(root, bundle)
         server = ThreadingHTTPServer(('127.0.0.1', 0), lambda *a, **k: Handler(*a, directory=tmp, **k))
@@ -53,6 +62,15 @@ with tempfile.TemporaryDirectory() as tmp:
         dest = project / f'fetched-{soc}'
         module.fetch(url, digest, dest)
         assert not (dest / 'ubuntu-rootfs.img').exists()
+        assert (dest / 'bluetooth').exists() == (soc == 'rk3588')
+        if soc == 'rk3588':
+            restored = dest / 'bluetooth/rootfs/usr/libexec/platform-bluetooth/start'
+            assert restored.read_bytes() == radio.read_bytes()
+            assert restored.stat().st_mode & 0o777 == 0o644
+            target = project / 'radio-rootfs'
+            target.mkdir()
+            subprocess.run(['python3', str(bluetooth_importer), 'install', '--inputs', str(dest / 'bluetooth'), '--rootfs', str(target)], check=True)
+            assert (target / 'usr/libexec/platform-bluetooth/start').stat().st_mode & 0o777 == 0o755
         _, selected = module.load(dest)
         env = module.env_for(dest, selected, project / 'output')
         assert env['SOC_MODEL'] == soc and env['BOOTFS_BASE_DTB'] == 'board.dtb'

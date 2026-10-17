@@ -24,6 +24,7 @@ ubuntu/artifacts/
 │   ├── module-manifest.tsv
 │   ├── local-deb-manifest.tsv
 │   └── SHA256SUMS                  # 由暂存脚本生成
+├── bluetooth/                      # 可选：蓝牙固件、程序和配置，自动随包上传
 ├── sources/
 │   ├── update-engine.tar
 │   └── update-engine.tar.source-info
@@ -86,6 +87,8 @@ UPDATE_ENGINE_SOURCE_ARCHIVE="$PWD/artifacts/sources/update-engine.tar" \
 当前两套 workflow 都构建上述三个产品，`variants` 应包含三者。
 默认安装当前软件源可选的最新版本；只有显式配置 `package_manifests` 才冻结版本，
 详见 [PACKAGE-MANIFEST.md](PACKAGE-MANIFEST.md)。
+
+蓝牙的芯片、UART 及初始化信息仅放在外部目录，见 [蓝牙输入规范](BLUETOOTH-ASSETS.md)。
 
 ## 2. 加入 U-Boot 和整包打包输入
 

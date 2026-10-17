@@ -13,6 +13,7 @@ artifacts/
     modules/            # 保持 lib/modules/<kernel-release> 的目录结构
     debs/               # ARM64 DEB 和允许的 architecture=all 包
     iqfiles/            # 可选外部相机 IQ 数据
+  bluetooth/            # 可选：外部蓝牙固件、初始化程序、服务和设备配置
   sources/
     update-engine.tar
     update-engine.tar.source-info
@@ -70,3 +71,5 @@ ext4 boot/userdata。每个变体附件包含 `ubuntu-rootfs.img` 与 SHA256，�
 使用独立门禁，不能由 CI 编译结果替代。
 
 命令行与网页上传的完整步骤见 [UPLOAD-ASSETS.md](UPLOAD-ASSETS.md)。
+
+蓝牙输入放置规范与自动集成行为见 [BLUETOOTH-ASSETS.md](BLUETOOTH-ASSETS.md)。
